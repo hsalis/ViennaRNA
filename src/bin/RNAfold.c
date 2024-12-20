@@ -38,6 +38,9 @@
 #include "ViennaRNA/mfe/global.h"
 #include "ViennaRNA/structures/centroid.h"
 #include "ViennaRNA/structures/mea.h"
+#include "ViennaRNA/structures/pairtable.h"
+#include "ViennaRNA/structures/benchmark.h"
+#include "ViennaRNA/sequences/alphabet.c"
 #include "ViennaRNA/params/basic.h"
 #include "ViennaRNA/constraints/basic.h"
 #include "ViennaRNA/probing/SHAPE.h"
@@ -91,6 +94,13 @@ struct options {
   probing_data_t  *probing_data;
 
   vrna_sc_mod_param_t *mod_params;
+
+  unsigned int    benchmark;
+  FILE            *benchmark_file;
+  double          benchmark_tp;
+  double          benchmark_fp;
+  double          benchmark_tn;
+  double          benchmark_fn;
 
   int             jobs;
   int             tofile;
@@ -220,6 +230,7 @@ flush_cstr_callback(void          *auxdata,
       vrna_cstr_free(s->data);
 
     free(s);
+
   }
 }
 
@@ -417,6 +428,13 @@ init_default_options(struct options *opt)
 
   opt->mod_params         = NULL;
 
+  opt->benchmark          = 0;
+  opt->benchmark_file     = stdout;
+  opt->benchmark_tp       = 0.;
+  opt->benchmark_fp       = 0.;
+  opt->benchmark_tn       = 0.;
+  opt->benchmark_fn       = 0.;
+
   opt->jobs               = 1;
   opt->tofile             = 0;
   opt->output_file        = NULL;
@@ -578,6 +596,46 @@ main(int  argc,
       opt.keep_order = 0;
   }
 
+  if (args_info.benchmark_given) {
+    opt.benchmark = 1;
+
+    if (args_info.bm_output_given) {
+      char *bfname = vrna_filename_sanitize(args_info.bm_output_arg, opt.filename_delim);
+
+      char *mode = (args_info.bm_output_append_given) ? "a" : "w";
+
+      if (!(opt.benchmark_file = fopen(bfname, mode))) {
+        vrna_log_error("Failed to open benchmark file \"%s\" for %s",
+                       bfname,
+                       (args_info.bm_output_append_given) ? "appending" : "writing");
+        exit(EXIT_FAILURE);
+      }
+
+      free(bfname);
+    }
+
+    if (args_info.bm_rm_pk_given)
+      opt.benchmark |= 1 << 2;
+
+    if (args_info.bm_rm_nc_given)
+      opt.benchmark |= 1 << 3;
+
+    fprintf(opt.benchmark_file,
+            "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+            "ID",
+            "TP",
+            "FP",
+            "TN",
+            "FN",
+            "TPR",
+            "PPV",
+            "MCC",
+            "F1");
+
+    fflush(opt.benchmark_file);
+
+  }
+
   input_files = collect_unnamed_options(&args_info, &num_input);
   input_files = append_input_files(&args_info, input_files, &num_input);
 
@@ -652,6 +710,32 @@ main(int  argc,
    # post processing
    ################################################
    */
+
+  if (opt.benchmark) {
+    vrna_score_t scores = vrna_score_from_confusion_matrix(opt.benchmark_tp,
+                                                           opt.benchmark_tn,
+                                                           opt.benchmark_fp,
+                                                           opt.benchmark_fn);
+
+    THREADSAFE_FILE_OUTPUT(({
+      fprintf(opt.benchmark_file,
+              "%s\t%.1f\t%.1f\t%.1f\t%.1f\t%f\t%f\t%f\t%f\n",
+              "TOTAL",
+              scores.TP,
+              scores.FP,
+              scores.TN,
+              scores.FN,
+              scores.TPR,
+              scores.PPV,
+              scores.MCC,
+              scores.F1);
+    }))
+
+    fflush(opt.benchmark_file);
+
+    if (opt.benchmark_file != stdout)
+      fclose(opt.benchmark_file);
+  }
 
   /* close output stream if necessary */
   if ((opt.output_stream) && (opt.output_stream != stdout))
@@ -786,7 +870,8 @@ process_input(FILE            *input_stream,
   if (istty_in)
     read_opt |= VRNA_INPUT_NOSKIP_BLANK_LINES;
 
-  if (!fold_constrained)
+  if ((!fold_constrained) &&
+      (!opt->benchmark))
     read_opt |= VRNA_INPUT_NO_REST;
 
   /* main loop that processes each record obtained from input stream */
@@ -866,7 +951,7 @@ process_record(struct record_data *record)
 {
   unsigned int          length;
   struct options        *opt;
-  char                  *rec_sequence, *mfe_structure;
+  char                  *rec_sequence, *mfe_structure, *ref_structure;
   double                min_en, energy;
   vrna_fold_compound_t  *vc;
   struct output_stream  *o_stream;
@@ -875,7 +960,8 @@ process_record(struct record_data *record)
 
   opt = record->options;
 
-  rec_sequence = strdup(record->sequence);
+  rec_sequence  = strdup(record->sequence);
+  ref_structure = NULL;
 
   mod_positions   = mod_positions_seq_prepare(rec_sequence,
                                               opt->mod_params,
@@ -931,6 +1017,11 @@ process_record(struct record_data *record)
     apply_probing_data(vc,
                        opt->probing_data);
 
+  if (opt->benchmark)
+    ref_structure = vrna_extract_record_rest_structure((const char **)record->rest,
+                                                       0,
+                                                       VRNA_OPTION_MULTILINE);
+
 #if 0
   if (opt->shape) {
     constraints_add_SHAPE(vc,
@@ -968,8 +1059,10 @@ process_record(struct record_data *record)
 
 
   /* put header + sequence into output string stream */
-  vrna_cstr_print_fasta_header(o_stream->data, record->id);
-  vrna_cstr_printf(o_stream->data, "%s\n", record->sequence);
+  if (!opt->benchmark) {
+    vrna_cstr_print_fasta_header(o_stream->data, record->id);
+    vrna_cstr_printf(o_stream->data, "%s\n", record->sequence);
+  }
 
   min_en = (double)vrna_mfe(vc, mfe_structure);
 
@@ -983,7 +1076,84 @@ process_record(struct record_data *record)
     }
   }
 
-  if (!opt->lucky) {
+  if (opt->benchmark) {
+    short *pt = vrna_ptable(mfe_structure);
+    short *pt_gold = vrna_ptable_from_string(ref_structure, VRNA_BRACKETS_ANY);
+
+    if (opt->benchmark & (1 << 2)) {
+      /* remove pseudoknots */
+      short *tmp = vrna_pt_pk_remove(pt_gold, 0);
+      free(pt_gold);
+      pt_gold = tmp;
+    }
+
+    if (opt->benchmark & (1 << 3)) {
+      /* remove non-canonical basepairs */
+      for (unsigned int i = 1; i <= vc->length; ++i) {
+        if (pt_gold[i] > i) {
+          unsigned int j = pt_gold[i];
+
+          /* remove too-short hairpins */
+          if ((j - i) > 3) {
+            unsigned int type = vrna_get_ptype_md(vc->sequence_encoding2[i],
+                                                  vc->sequence_encoding2[j],
+                                                  &(vc->params->model_details));
+            if ((type == 0) ||
+                (type == 7)) {
+              pt_gold[j] = pt_gold[i] = 0;
+            }
+          } else {
+            pt_gold[j] = pt_gold[i] = 0;
+          }
+        }
+      }
+    }
+
+    vrna_score_t scores = vrna_compare_structure_pt(pt_gold, pt, 0);
+
+    ATOMIC_BLOCK({
+      opt->benchmark_tp += scores.TP;
+      opt->benchmark_fp += scores.FP;
+      opt->benchmark_tn += scores.TN;
+      opt->benchmark_fn += scores.FN;
+    })
+
+    if (opt->benchmark_file != stdout) {
+      vrna_cstr_print_fasta_header(o_stream->data, record->id);
+      vrna_cstr_printf(o_stream->data, "%s\n", record->sequence);
+
+      char *ref_struct_processed = vrna_db_from_ptable(pt_gold);
+      vrna_cstr_printf_structure(o_stream->data,
+                                 mfe_structure,
+                                 " (%6.2f) [predition]",
+                                 min_en);
+      vrna_cstr_printf_structure(o_stream->data,
+                                 ref_struct_processed,
+                                 " (%6.2f) [reference]",
+                                 vrna_eval_structure(vc, ref_struct_processed));
+      free(ref_struct_processed);
+    }
+
+    THREADSAFE_FILE_OUTPUT(({
+      fprintf(opt->benchmark_file,
+              "%s\t%.1f\t%.1f\t%.1f\t%.1f\t%f\t%f\t%f\t%f\n",
+              record->id,
+              scores.TP,
+              scores.FP,
+              scores.TN,
+              scores.FN,
+              scores.TPR,
+              scores.PPV,
+              scores.MCC,
+              scores.F1);
+    }))
+
+    fflush(opt->benchmark_file);
+
+    free(pt);
+    free(pt_gold);
+    goto record_end;
+  } else if (!opt->lucky) {
     vrna_cstr_printf_structure(o_stream->data,
                                mfe_structure,
                                record->tty ?  "\n minimum free energy = %6.2f kcal/mol" : " (%6.2f)",
@@ -1130,7 +1300,8 @@ process_record(struct record_data *record)
     free(pf_struc);
   }
 
-  /* print what we've collected in output charstream */
+record_end:
+
   if (opt->output_queue) {
     if (o_stream->individual) {
       /* output immediately */
@@ -1152,6 +1323,7 @@ process_record(struct record_data *record)
   free(record->sequence);
   free(rec_sequence);
   free(mfe_structure);
+  free(ref_structure);
 
   /* free the rest of current dataset */
   if (record->rest) {
