@@ -20,6 +20,8 @@
 #include "ViennaRNA/params/basic.h"
 #include "ViennaRNA/params/salt.h"
 
+#define SPEEDUP_PARAMS    1
+
 /**
  *** \file ViennaRNA/params/basic.c
  *** <P>
@@ -95,6 +97,16 @@ PRIVATE int               id = -1;
 PRIVATE vrna_exp_param_t  pf;
 PRIVATE int               pf_id = -1;
 
+#if SPEEDUP_PARAMS
+
+PRIVATE vrna_param_t      p_pre       = { 0 };
+PRIVATE unsigned char     p_pre_init  = 0;
+
+PRIVATE vrna_exp_param_t  pf_pre = { 0 };
+PRIVATE unsigned char     pf_pre_init  = 0;
+
+#endif
+
 #ifdef _OPENMP
 #pragma omp threadprivate(id, pf_id)
 #endif
@@ -130,28 +142,78 @@ rescale_params(vrna_fold_compound_t *vc);
  #################################
  */
 PUBLIC vrna_param_t *
-vrna_params(vrna_md_t *md)
+vrna_params(vrna_md_t *md_p)
 {
-  if (md) {
-    return get_scaled_params(md);
-  } else {
-    vrna_md_t md;
+  vrna_param_t  *cp = NULL;
+  vrna_md_t     md;
+
+  if (md_p == NULL) {
     vrna_md_set_default(&md);
-    return get_scaled_params(&md);
+    md_p = &md;
   }
+
+#if SPEEDUP_PARAMS
+  if (p_pre_init) {
+    /* ignore window_size, max_bp_span, and min_loop_size here */
+    p_pre.model_details.window_size   = md_p->window_size;
+    p_pre.model_details.min_loop_size = md_p->min_loop_size;
+    p_pre.model_details.max_bp_span   = md_p->max_bp_span;
+
+    if (memcmp(md_p, &(p_pre.model_details), sizeof(vrna_md_t)) == 0) {
+      return vrna_params_copy(&p_pre);
+    }
+  }
+
+  cp = get_scaled_params(md_p);
+
+  /* store with current settings */
+  memcpy(&p_pre, cp, sizeof(vrna_param_t));
+
+  p_pre_init = (unsigned char)1;
+
+  return cp;
+#else
+  return get_scaled_params(md_p);
+#endif
 }
 
 
 PUBLIC vrna_exp_param_t *
-vrna_exp_params(vrna_md_t *md)
+vrna_exp_params(vrna_md_t *md_p)
 {
-  if (md) {
-    return get_scaled_exp_params(md, -1.);
-  } else {
-    vrna_md_t md;
+  vrna_exp_param_t  *cp = NULL;
+  vrna_md_t         md;
+
+  if (md_p == NULL) {
     vrna_md_set_default(&md);
-    return get_scaled_exp_params(&md, -1.);
+    md_p = &md;
   }
+
+#if SPEEDUP_PARAMS
+  if (pf_pre_init) {
+    /* ignore window_size, max_bp_span, and min_loop_size here */
+    pf_pre.model_details.window_size   = md_p->window_size;
+    pf_pre.model_details.min_loop_size = md_p->min_loop_size;
+    pf_pre.model_details.max_bp_span   = md_p->max_bp_span;
+
+    if (memcmp(md_p, &(pf_pre.model_details), sizeof(vrna_md_t)) == 0) {
+      cp = vrna_exp_params_copy(&pf_pre);
+      cp->pf_scale = -1.0;
+      return cp;
+    }
+  }
+
+  cp = get_scaled_exp_params(md_p, -1.0);
+
+  /* store with current settings */
+  memcpy(&pf_pre, cp, sizeof(vrna_exp_param_t));
+
+  pf_pre_init = (unsigned char)1;
+
+  return cp;
+#else
+  return get_scaled_exp_params(md_p, -1.0);
+#endif
 }
 
 
