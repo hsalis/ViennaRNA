@@ -749,7 +749,19 @@ process_record(struct record_data *record)
   energy = vrna_eval_structure_cstr(vc, structure, opt->verbose, o_stream->data);
   vrna_cstr_printf(o_stream->data, "%s\n", record->sequence);
 
-  char *pstruct = vrna_cut_point_insert(structure, vc->cutpoint);
+  char  *pstruct    = NULL;
+  char  *tmp_struct = strdup(structure);
+
+  if (vc->strands == 1) {
+    pstruct = tmp_struct;
+  } else {
+    for (unsigned int i = 1; i < vc->strands; i++) {
+      pstruct = vrna_cut_point_insert(tmp_struct, (int)vc->strand_start[i] + (i - 1));
+      free(tmp_struct);
+      tmp_struct = pstruct;
+    }
+  }
+
   vrna_cstr_printf_structure(o_stream->data,
                              pstruct,
                              record->tty ? "\n energy = %6.2f kcal/mol" : " (%6.2f)",
