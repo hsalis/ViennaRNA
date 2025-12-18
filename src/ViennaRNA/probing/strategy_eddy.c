@@ -597,3 +597,49 @@ bandwidth(unsigned int  n,
   std = sqrt(std / (count - 1));
   return (FLT_OR_DBL)(factor * std);
 }
+
+
+#ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
+
+vrna_probing_data_t
+vrna_probing_data_Eddy2014_2(const double *reactivities,
+                             unsigned int n,
+                             const double *unpaired_data,
+                             unsigned int unpaired_len,
+                             const double *paired_data,
+                             unsigned int paired_len)
+{
+  return vrna_probing_data_eddy(reactivities,
+                                n,
+                                37.0,
+                                VRNA_PROBING_STRATEGY_EDDY_OPTIONS_DEFAULT,
+                                unpaired_data,
+                                unpaired_len,
+                                paired_data,
+                                paired_len);
+}
+
+
+vrna_probing_data_t
+vrna_probing_data_Eddy2014_2_comparative(const double **reactivities,
+                                         unsigned int *n,
+                                         unsigned int n_seq,
+                                         const double **unpaired_datas,
+                                         unsigned int *unpaired_lens,
+                                         const double **paired_datas,
+                                         unsigned int *paired_lens,
+                                         unsigned int multi_params)
+{
+  return vrna_probing_data_eddy_comparative(reactivities,
+                                            n,
+                                            n_seq,
+                                            37.0,
+                                            VRNA_PROBING_STRATEGY_EDDY_OPTIONS_DEFAULT,
+                                            unpaired_datas,
+                                            unpaired_lens,
+                                            paired_datas,
+                                            paired_lens,
+                                            multi_params);
+}
+
+#endif

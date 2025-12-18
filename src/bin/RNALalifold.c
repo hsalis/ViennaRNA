@@ -505,7 +505,7 @@ main(int  argc,
     }
 
     if (with_shapes) {
-      vrna_constraints_add_SHAPE_ali(fc, \
+      constraints_add_SHAPE_ali(fc, \
                                      shape_method, \
                                      (const char **)shape_files, \
                                      shape_file_association, \

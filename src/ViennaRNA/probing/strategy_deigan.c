@@ -337,3 +337,35 @@ conversion_deigan(double  reactivity,
 {
   return reactivity == VRNA_REACTIVITY_MISSING ? 0. : (double)(m * log(reactivity + 1) + b);
 }
+
+
+#ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
+
+vrna_probing_data_t
+vrna_probing_data_Deigan2009(const double *reactivities,
+                             unsigned int n,
+                             double       m,
+                             double       b)
+{
+  return vrna_probing_data_deigan(reactivities, n, m, b);
+}
+
+
+vrna_probing_data_t
+vrna_probing_data_Deigan2009_comparative(const double       **reactivities,
+                                         const unsigned int *n,
+                                         unsigned int       n_seq,
+                                         double             *ms,
+                                         double             *bs,
+                                         unsigned int       multi_params)
+{
+  return vrna_probing_data_deigan_comparative(reactivities,
+                                              n,
+                                              n_seq,
+                                              ms,
+                                              bs,
+                                              multi_params);
+}
+
+
+#endif

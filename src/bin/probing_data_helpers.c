@@ -196,12 +196,12 @@ apply_probing_data(vrna_fold_compound_t *fc,
 
 
 PUBLIC void
-vrna_constraints_add_SHAPE(vrna_fold_compound_t *vc,
-                           const char           *shape_file,
-                           const char           *shape_method,
-                           const char           *shape_conversion,
-                           int                  verbose,
-                           unsigned int         constraint_type)
+constraints_add_SHAPE(vrna_fold_compound_t *vc,
+                      const char           *shape_file,
+                      const char           *shape_method,
+                      const char           *shape_conversion,
+                      int                  verbose,
+                      unsigned int         constraint_type)
 {
   float             p1, p2;
   char              method;
@@ -272,12 +272,12 @@ vrna_constraints_add_SHAPE(vrna_fold_compound_t *vc,
 
 
 PUBLIC void
-vrna_constraints_add_SHAPE_ali(vrna_fold_compound_t *vc,
-                               const char           *shape_method,
-                               const char           **shape_files,
-                               const int            *shape_file_association,
-                               int                  verbose,
-                               unsigned int         constraint_type)
+constraints_add_SHAPE_ali(vrna_fold_compound_t *vc,
+                          const char           *shape_method,
+                          const char           **shape_files,
+                          const int            *shape_file_association,
+                          int                  verbose,
+                          unsigned int         constraint_type)
 {
   float p1, p2;
   char  method;
@@ -306,10 +306,10 @@ vrna_constraints_add_SHAPE_ali(vrna_fold_compound_t *vc,
 }
 
 PUBLIC int
-vrna_sc_SHAPE_parse_method(const char *method_string,
-                           char       *method,
-                           float      *param_1,
-                           float      *param_2)
+sc_SHAPE_parse_method(const char *method_string,
+                      char       *method,
+                      float      *param_1,
+                      float      *param_2)
 {
   const char *params = method_string + 1;
 
@@ -413,12 +413,12 @@ sc_parse_parameters(const char  *string,
 
 
 PUBLIC double **
-vrna_probing_data_load_n_distribute(unsigned int  n_seq,
-                                    unsigned int  *ns,
-                                    const char    **sequences,
-                                    const char    **file_names,
-                                    const int     *file_name_association,
-                                    unsigned int  options)
+probing_data_load_n_distribute(unsigned int  n_seq,
+                               unsigned int  *ns,
+                               const char    **sequences,
+                               const char    **file_names,
+                               const int     *file_name_association,
+                               unsigned int  options)
 {
   char          *sequence;
   unsigned int  s, ss;

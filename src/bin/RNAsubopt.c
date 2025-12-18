@@ -453,7 +453,7 @@ main(int  argc,
 
 #else
     if (with_shapes) {
-      vrna_constraints_add_SHAPE(vc,
+      constraints_add_SHAPE(vc,
                                  shape_file,
                                  shape_method,
                                  shape_conversion,

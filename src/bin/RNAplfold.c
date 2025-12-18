@@ -504,7 +504,7 @@ main(int  argc,
       vrna_fold_compound_t *fc = vrna_fold_compound(rec_sequence, &md, VRNA_OPTION_WINDOW);
 
       if (with_shapes) {
-        vrna_constraints_add_SHAPE(fc,
+        constraints_add_SHAPE(fc,
                                    shape_file,
                                    shape_method,
                                    shape_conversion,

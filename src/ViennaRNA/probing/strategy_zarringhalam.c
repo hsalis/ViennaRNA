@@ -572,3 +572,38 @@ set_mapping_strategy(const char                   *conversion_string,
 
   return transform_function;
 }
+
+
+#ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
+
+vrna_probing_data_t
+vrna_probing_data_Zarringhalam2012(const double *reactivities,
+                                   unsigned int n,
+                                   double       beta,
+                                   const char   *pr_conversion,
+                                   double       pr_default)
+{
+  return vrna_probing_data_zarringhalam(reactivities, n, beta, pr_conversion, pr_default);
+}
+
+
+vrna_probing_data_t
+vrna_probing_data_Zarringhalam2012_comparative(const double **reactivities,
+                                               unsigned int *n,
+                                               unsigned int n_seq,
+                                               double       *betas,
+                                               const char   **pr_conversions,
+                                               double       *pr_defaults,
+                                               unsigned int multi_params)
+{
+  return vrna_probing_data_zarringhalam_comparative(reactivities,
+                                                    n,
+                                                    n_seq,
+                                                    betas,
+                                                    pr_conversions,
+                                                    pr_defaults,
+                                                    multi_params);
+}
+
+
+#endif

@@ -390,7 +390,7 @@ main(int  argc,
       vrna_commands_apply(vc, commands, VRNA_CMD_PARSE_HC | VRNA_CMD_PARSE_SC);
 
     if (with_shapes) {
-      vrna_constraints_add_SHAPE(vc,
+      constraints_add_SHAPE(vc,
                                  shape_file,
                                  shape_method,
                                  shape_conversion,

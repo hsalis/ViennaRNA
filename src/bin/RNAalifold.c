@@ -1464,7 +1464,7 @@ apply_SHAPE_data(vrna_fold_compound_t *fc,
   opt->shape_file_association = (int *)vrna_realloc(opt->shape_file_association,
                                                     (s + 1) * sizeof(int));
 
-  vrna_constraints_add_SHAPE_ali(fc,
+  constraints_add_SHAPE_ali(fc,
                                  opt->shape_method,
                                  (const char **)opt->shape_files,
                                  opt->shape_file_association,

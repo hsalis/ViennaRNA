@@ -654,7 +654,7 @@ process_record(struct record_data *record)
   n = (int)vc->length;
 
   if (opt->shape) {
-    vrna_constraints_add_SHAPE(vc,
+    constraints_add_SHAPE(vc,
                                opt->shape_file,
                                opt->shape_method,
                                opt->shape_conversion,

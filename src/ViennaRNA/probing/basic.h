@@ -3,6 +3,19 @@
 
 #include <ViennaRNA/fold_compound.h>
 
+#ifdef VRNA_WARN_DEPRECATED
+# if defined(__clang__)
+#  define DEPRECATED(func, msg) func __attribute__ ((deprecated("", msg)))
+# elif defined(__GNUC__)
+#  define DEPRECATED(func, msg) func __attribute__ ((deprecated(msg)))
+# else
+#  define DEPRECATED(func, msg) func
+# endif
+#else
+# define DEPRECATED(func, msg) func
+#endif
+
+
 /**
  *  @file     ViennaRNA/probing/basic.h
  *  @ingroup  probing_data
@@ -280,6 +293,81 @@ vrna_sc_SHAPE_to_pr(const char  *shape_conversion,
                     double      *values,
                     int         length,
                     double      default_value);
+
+
+#ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
+
+DEPRECATED(double **
+vrna_probing_data_load_n_distribute(unsigned int  n_seq,
+                                    unsigned int  *ns,
+                                    const char    **sequences,
+                                    const char    **file_names,
+                                    const int     *file_name_association,
+                                    unsigned int  options),
+"This function is obsolete and will be removed in the future");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Deigan2009(const double *reactivities,
+                             unsigned int n,
+                             double       m,
+                             double       b),
+"Use vrna_probing_data_deigan() instead");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Deigan2009_comparative(const double       **reactivities,
+                                         const unsigned int *n,
+                                         unsigned int       n_seq,
+                                         double             *ms,
+                                         double             *bs,
+                                         unsigned int       multi_params),
+"Use vrna_probing_data_deigan_comparative() instead");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Zarringhalam2012(const double *reactivities,
+                                   unsigned int n,
+                                   double       beta,
+                                   const char   *pr_conversion,
+                                   double       pr_default),
+"Use vrna_probing_data_zarringhalam() instead");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Zarringhalam2012_comparative(const double **reactivities,
+                                               unsigned int *n,
+                                               unsigned int n_seq,
+                                               double       *betas,
+                                               const char   **pr_conversions,
+                                               double       *pr_defaults,
+                                               unsigned int multi_params),
+"Use vrna_probing_data_zarringhalam_comparative() instead");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Eddy2014_2(const double *reactivities,
+                             unsigned int n,
+                             const double *unpaired_data,
+                             unsigned int unpaired_len,
+                             const double *paired_data,
+                             unsigned int paired_len),
+"Use vrna_probing_data_eddy() instead");
+
+
+DEPRECATED(vrna_probing_data_t
+vrna_probing_data_Eddy2014_2_comparative(const double **reactivities,
+                                         unsigned int *n,
+                                         unsigned int n_seq,
+                                         const double **unpaired_datas,
+                                         unsigned int *unpaired_lens,
+                                         const double **paired_datas,
+                                         unsigned int *paired_lens,
+                                         unsigned int multi_params),
+"Use vrna_probing_data_eddy_comparative() instead");
+
+
+#endif
 
 
 /**
