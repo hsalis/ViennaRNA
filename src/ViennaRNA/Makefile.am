@@ -543,6 +543,7 @@ libRNA_data_la_SOURCES = \
 
 libRNA_math_la_SOURCES = \
     math/fun_bin.c \
+    math/fun_chain.c \
     math/fun_gaussian.c \
     math/fun_kde.c \
     math/fun_linear.c \

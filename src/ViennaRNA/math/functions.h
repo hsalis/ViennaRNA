@@ -563,6 +563,21 @@ vrna_math_fun_dbl_gaussian_opt(double                       a,
                                vrna_math_fun_dbl_opt_free_f *fun_options_free);
 
 
+vrna_math_fun_dbl_f
+vrna_math_fun_dbl_chain(vrna_math_fun_dbl_f           first_f,
+                        vrna_math_fun_dbl_opt_t       first_f_opt,
+                        vrna_math_fun_dbl_opt_free_f  first_f_opt_free,
+                        vrna_math_fun_dbl_opt_t       *fun_options_p,
+                        vrna_math_fun_dbl_opt_free_f  *fun_options_free);
+
+
+size_t
+vrna_math_fun_dbl_chain_append(vrna_math_fun_dbl_opt_t      chain_opt,
+                               vrna_math_fun_dbl_f          f,
+                               vrna_math_fun_dbl_opt_t      f_opt,
+                               vrna_math_fun_dbl_opt_free_f f_opt_free);
+
+
 /**
  *  @}
  */
