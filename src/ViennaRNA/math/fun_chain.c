@@ -91,14 +91,14 @@ vrna_math_fun_dbl_chain(vrna_math_fun_dbl_f           first_f,
 
 
 PUBLIC size_t
-vrna_math_fun_dbl_chain_append(vrna_math_fun_dbl_opt_t      chain_opt,
+vrna_math_fun_dbl_chain_append(vrna_math_fun_dbl_opt_t      chain,
                                vrna_math_fun_dbl_f          f,
                                vrna_math_fun_dbl_opt_t      f_opt,
                                vrna_math_fun_dbl_opt_free_f f_opt_free)
 {
-  if ((chain_opt) &&
+  if ((chain) &&
       (f)) {
-    fun_chain_opt_t *o = (fun_chain_opt_t *)chain_opt;
+    fun_chain_opt_t *o = (fun_chain_opt_t *)chain;
 
     vrna_array_append(o->f, f);
     vrna_array_append(o->f_opt, f_opt);
@@ -108,6 +108,41 @@ vrna_math_fun_dbl_chain_append(vrna_math_fun_dbl_opt_t      chain_opt,
   }
 
   return 0;
+}
+
+
+PUBLIC size_t
+vrna_math_fun_dbl_chain_size(vrna_math_fun_dbl_opt_t chain)
+{
+  if (chain)
+    return vrna_array_size(((fun_chain_opt_t *)chain)->f);
+
+  return 0;
+}
+
+
+PUBLIC vrna_math_fun_dbl_f
+vrna_math_fun_dbl_chain_at(vrna_math_fun_dbl_opt_t  chain,
+                           size_t                   pos,
+                           vrna_math_fun_dbl_opt_t  *fun_options_p)
+{
+  vrna_math_fun_dbl_f cb = NULL;
+
+  if ((chain) &&
+      (fun_options_p)) {
+    fun_chain_opt_t *o = (fun_chain_opt_t *)chain;
+
+    if (pos < vrna_array_size(o->f)) {
+      cb              = o->f[pos];
+      *fun_options_p  = o->f_opt[pos];
+    } else {
+      vrna_log_error("Requested position %ld exceeds total size (%ld) of function chain",
+                     pos,
+                     vrna_array_size(o->f));
+    }
+  }
+
+  return cb;
 }
 
 

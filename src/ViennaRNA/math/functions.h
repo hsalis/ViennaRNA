@@ -578,6 +578,16 @@ vrna_math_fun_dbl_chain_append(vrna_math_fun_dbl_opt_t      chain_opt,
                                vrna_math_fun_dbl_opt_free_f f_opt_free);
 
 
+size_t
+vrna_math_fun_dbl_chain_size(vrna_math_fun_dbl_opt_t chain);
+
+
+vrna_math_fun_dbl_f
+vrna_math_fun_dbl_chain_at(vrna_math_fun_dbl_opt_t  chain,
+                           size_t                   pos,
+                           vrna_math_fun_dbl_opt_t  *fun_options_p);
+
+
 /**
  *  @}
  */
