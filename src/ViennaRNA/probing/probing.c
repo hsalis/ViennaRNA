@@ -34,11 +34,11 @@
 
 
 struct vrna_probing_data_s {
-  vrna_array(double *)                  data_linear;          /* actual data */
-  vrna_array(double *)                  data_linear_weight;   /* weight for each data set */
-  vrna_array(vrna_probing_strategy_f)   cbs_linear;
-  vrna_array(void *)                    cbs_linear_options;
-  vrna_array(vrna_auxdata_free_f)       cbs_linear_options_free;
+  vrna_array(double *)                    data_linear;          /* actual data */
+  vrna_array(double *)                    data_linear_weight;   /* weight for each data set */
+  vrna_array(vrna_probing_strategy_f)     cbs_linear;
+  vrna_array(vrna_probing_strategy_opt_t) cbs_linear_options;
+  vrna_array(vrna_auxdata_free_f)         cbs_linear_options_free;
 };
 
 

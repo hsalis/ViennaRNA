@@ -64,7 +64,7 @@ typedef struct vrna_probing_data_s *vrna_probing_data_t;
 #define VRNA_PROBING_DATA_LINEAR_TARGET_BP                        (1 << 6)
 
 
-typedef void * vrna_probing_strategy_opt_t;
+typedef void *vrna_probing_strategy_opt_t;
 
 /**
  *  @brief  Prototype of a strategy to derive pseudo energies from linear structure probing data
@@ -133,6 +133,41 @@ typedef double *(*vrna_probing_strategy_f)(vrna_fold_compound_t *fc,
  *  @see vrna_probing_data_deigan_comparative(), vrna_probing_data_zarringhalam_comparative()
  */
 #define VRNA_PROBING_METHOD_MULTI_PARAMS_DEFAULT                  VRNA_PROBING_METHOD_MULTI_PARAMS_0
+
+
+double *
+vrna_probing_strategy_chain(vrna_fold_compound_t        *fc,
+                            const double                *data,
+                            size_t                      data_size,
+                            unsigned int                target,
+                            vrna_probing_strategy_opt_t options);
+
+
+vrna_probing_strategy_opt_t
+vrna_probing_strategy_chain_data(vrna_probing_strategy_f      strategy_cb,
+                                 vrna_probing_strategy_opt_t  strategy_cb_options,
+                                 vrna_auxdata_free_f          strategy_cb_options_free);
+
+
+size_t
+vrna_probing_strategy_chain_data_append(vrna_probing_strategy_opt_t chain,
+                                        vrna_probing_strategy_f     strategy_cb,
+                                        vrna_probing_strategy_opt_t strategy_cb_options,
+                                        vrna_auxdata_free_f         strategy_cb_options_free);
+
+
+size_t
+vrna_probing_strategy_chain_data_size(vrna_probing_strategy_opt_t chain);
+
+
+vrna_probing_strategy_f
+vrna_probing_strategy_chain_data_at(vrna_probing_strategy_opt_t chain,
+                                    size_t                      pos,
+                                    vrna_probing_strategy_opt_t *strategy_cb_options);
+
+
+void
+vrna_probing_strategy_chain_data_free(vrna_probing_strategy_opt_t options);
 
 
 /**
@@ -300,73 +335,73 @@ vrna_sc_SHAPE_to_pr(const char  *shape_conversion,
 #ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
 
 DEPRECATED(double **
-vrna_probing_data_load_n_distribute(unsigned int  n_seq,
-                                    unsigned int  *ns,
-                                    const char    **sequences,
-                                    const char    **file_names,
-                                    const int     *file_name_association,
-                                    unsigned int  options),
-"This function is obsolete and will be removed in the future");
+           vrna_probing_data_load_n_distribute(unsigned int n_seq,
+                                               unsigned int *ns,
+                                               const char **sequences,
+                                               const char **file_names,
+                                               const int *file_name_association,
+                                               unsigned int options),
+           "This function is obsolete and will be removed in the future");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Deigan2009(const double *reactivities,
-                             unsigned int n,
-                             double       m,
-                             double       b),
-"Use vrna_probing_data_deigan() instead");
+           vrna_probing_data_Deigan2009(const double  *reactivities,
+                                        unsigned int  n,
+                                        double        m,
+                                        double        b),
+           "Use vrna_probing_data_deigan() instead");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Deigan2009_comparative(const double       **reactivities,
-                                         const unsigned int *n,
-                                         unsigned int       n_seq,
-                                         double             *ms,
-                                         double             *bs,
-                                         unsigned int       multi_params),
-"Use vrna_probing_data_deigan_comparative() instead");
+           vrna_probing_data_Deigan2009_comparative(const double        **reactivities,
+                                                    const unsigned int  *n,
+                                                    unsigned int        n_seq,
+                                                    double              *ms,
+                                                    double              *bs,
+                                                    unsigned int        multi_params),
+           "Use vrna_probing_data_deigan_comparative() instead");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Zarringhalam2012(const double *reactivities,
-                                   unsigned int n,
-                                   double       beta,
-                                   const char   *pr_conversion,
-                                   double       pr_default),
-"Use vrna_probing_data_zarringhalam() instead");
+           vrna_probing_data_Zarringhalam2012(const double  *reactivities,
+                                              unsigned int  n,
+                                              double        beta,
+                                              const char    *pr_conversion,
+                                              double        pr_default),
+           "Use vrna_probing_data_zarringhalam() instead");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Zarringhalam2012_comparative(const double **reactivities,
-                                               unsigned int *n,
-                                               unsigned int n_seq,
-                                               double       *betas,
-                                               const char   **pr_conversions,
-                                               double       *pr_defaults,
-                                               unsigned int multi_params),
-"Use vrna_probing_data_zarringhalam_comparative() instead");
+           vrna_probing_data_Zarringhalam2012_comparative(const double  **reactivities,
+                                                          unsigned int  *n,
+                                                          unsigned int  n_seq,
+                                                          double        *betas,
+                                                          const char    **pr_conversions,
+                                                          double        *pr_defaults,
+                                                          unsigned int  multi_params),
+           "Use vrna_probing_data_zarringhalam_comparative() instead");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Eddy2014_2(const double *reactivities,
-                             unsigned int n,
-                             const double *unpaired_data,
-                             unsigned int unpaired_len,
-                             const double *paired_data,
-                             unsigned int paired_len),
-"Use vrna_probing_data_eddy() instead");
+           vrna_probing_data_Eddy2014_2(const double  *reactivities,
+                                        unsigned int  n,
+                                        const double  *unpaired_data,
+                                        unsigned int  unpaired_len,
+                                        const double  *paired_data,
+                                        unsigned int  paired_len),
+           "Use vrna_probing_data_eddy() instead");
 
 
 DEPRECATED(vrna_probing_data_t
-vrna_probing_data_Eddy2014_2_comparative(const double **reactivities,
-                                         unsigned int *n,
-                                         unsigned int n_seq,
-                                         const double **unpaired_datas,
-                                         unsigned int *unpaired_lens,
-                                         const double **paired_datas,
-                                         unsigned int *paired_lens,
-                                         unsigned int multi_params),
-"Use vrna_probing_data_eddy_comparative() instead");
+           vrna_probing_data_Eddy2014_2_comparative(const double  **reactivities,
+                                                    unsigned int  *n,
+                                                    unsigned int  n_seq,
+                                                    const double  **unpaired_datas,
+                                                    unsigned int  *unpaired_lens,
+                                                    const double  **paired_datas,
+                                                    unsigned int  *paired_lens,
+                                                    unsigned int  multi_params),
+           "Use vrna_probing_data_eddy_comparative() instead");
 
 
 #endif

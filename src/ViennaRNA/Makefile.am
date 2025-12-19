@@ -530,6 +530,7 @@ libRNA_constraints_la_SOURCES = \
 
 libRNA_probing_la_SOURCES = \
     probing/probing.c \
+    probing/strategy_chain.c \
     probing/strategy_deigan.c \
     probing/strategy_eddy.c \
     probing/strategy_nlogp.c \
