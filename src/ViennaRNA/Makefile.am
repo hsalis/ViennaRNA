@@ -281,6 +281,7 @@ vrna_probing_HEADERS = \
     probing/SHAPE.h \
     probing/strategy_deigan.h \
     probing/strategy_eddy.h \
+    probing/strategy_nlogp.h \
     probing/strategy_zarringhalam.h
 
 
@@ -530,8 +531,9 @@ libRNA_constraints_la_SOURCES = \
 libRNA_probing_la_SOURCES = \
     probing/probing.c \
     probing/strategy_deigan.c \
-    probing/strategy_zarringhalam.c \
     probing/strategy_eddy.c \
+    probing/strategy_nlogp.c \
+    probing/strategy_zarringhalam.c \
     probing/SHAPE.c
 
 

@@ -64,6 +64,8 @@ typedef struct vrna_probing_data_s *vrna_probing_data_t;
 #define VRNA_PROBING_DATA_LINEAR_TARGET_BP                        (1 << 6)
 
 
+typedef void * vrna_probing_strategy_opt_t;
+
 /**
  *  @brief  Prototype of a strategy to derive pseudo energies from linear structure probing data
  *
