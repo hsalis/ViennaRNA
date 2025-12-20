@@ -15,7 +15,22 @@
 #include "ViennaRNA/model.h"
 #include "ViennaRNA/utils/basic.h"
 #include "ViennaRNA/backtrack/global.h"
+#include "ViennaRNA/constraints/soft.h"
 #include "ViennaRNA/mfe/global.h"
+
+
+#ifndef INLINE
+# ifdef __GNUC__
+#   define INLINE inline
+# else
+#   define INLINE
+# endif
+#endif
+
+
+PRIVATE INLINE int
+get_stored_bp_contributions(vrna_sc_bp_storage_t  *container,
+                            unsigned int          j);
 
 
 /* wrappers for single sequences */
@@ -147,6 +162,42 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
                                                    &(vc->params->model_details),
                                                    VRNA_OPTION_DEFAULT);
 
+    /* extract soft constraints for second sequence, if any */
+    if (vc->sc) {
+      if (vc->sc->up_storage) {
+        for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+          vrna_sc_add_up(fc2, i - l1, (FLT_OR_DBL)vc->sc->up_storage[i] / 100., VRNA_OPTION_DEFAULT);
+        }
+      }
+
+      if (vc->sc->bp_storage) {
+        for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+          if (vc->sc->bp_storage[i]) {
+            for (unsigned int k = 1; k < l2; k++) {
+              unsigned int j = i + k;
+
+              if (j > l1 + l2)
+                break;
+
+              int e = get_stored_bp_contributions(vc->sc->bp_storage[i], j);
+
+              if (e != 0) {
+                vrna_sc_add_bp(fc2, i - l1, j - l1, (FLT_OR_DBL)e / 100., VRNA_OPTION_DEFAULT);
+              }
+            }
+          }
+        }
+      }
+
+      if (vc->sc->energy_stack) {
+        for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+          if (vc->sc->energy_stack[i] != 0) {
+            vrna_sc_add_stack(fc2, i - l1, (FLT_OR_DBL)vc->sc->energy_stack[i] / 100., VRNA_OPTION_DEFAULT);
+          }
+        }
+      }
+    }
+
     mfe2 = vrna_mfe(fc2, ss2);
 
     if (mfe1 + mfe2 < mfe) {
@@ -163,3 +214,30 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
 
   return mfe;
 }
+
+
+PRIVATE INLINE int
+get_stored_bp_contributions(vrna_sc_bp_storage_t  *container,
+                            unsigned int          j)
+{
+  unsigned int  cnt;
+  int           e;
+
+  e = 0;
+
+  /* go through list of constraints for current position i */
+  for (cnt = 0; container[cnt].interval_start != 0; cnt++) {
+    if (container[cnt].interval_start > j)
+      break; /* only constraints for pairs (i,q) with q > j left */
+
+    if (container[cnt].interval_end < j)
+      continue; /* constraint for pairs (i,q) with q < j */
+
+    /* constraint has interval [p,q] with p <= j <= q */
+    e += container[cnt].e;
+  }
+
+  return e;
+}
+
+

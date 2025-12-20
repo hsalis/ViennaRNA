@@ -50,6 +50,14 @@
 #include "probing_data_helpers.h"
 
 
+#ifndef INLINE
+# ifdef __GNUC__
+#   define INLINE inline
+# else
+#   define INLINE
+# endif
+#endif
+
 struct options {
   int             filename_full;
   char            *filename_delim;
@@ -172,6 +180,10 @@ compute_MEA(vrna_fold_compound_t  *fc,
             double                MEAgamma,
             vrna_cstr_t           rec_output);
 
+
+PRIVATE INLINE int
+get_stored_bp_contributions(vrna_sc_bp_storage_t  *container,
+                            unsigned int          j);
 
 /*--------------------------------------------------------------------------*/
 
@@ -1063,7 +1075,48 @@ process_record(struct record_data *record)
                                                          vc->nucleotides[0].string);
 
       char                  *ss_AA  = (char *)vrna_alloc(sizeof(char) * (2 * Alength + 1));
+
+
       vrna_fold_compound_t  *fc_AA  = vrna_fold_compound(seq_AA, &(opt->md), VRNA_OPTION_DEFAULT);
+
+      /* extract soft constraints from concatenated input above, if any */
+      if (vc->sc) {
+        if (vc->sc->up_storage) {
+          for (unsigned int i = 1; i <= Alength; ++i) {
+            vrna_sc_add_up(fc_AA, i, (FLT_OR_DBL)vc->sc->up_storage[i] / 100., VRNA_OPTION_DEFAULT);
+            vrna_sc_add_up(fc_AA, Alength + i, (FLT_OR_DBL)vc->sc->up_storage[i] / 100., VRNA_OPTION_DEFAULT);
+          }
+        }
+
+        if (vc->sc->bp_storage) {
+          for (unsigned int i = 1; i <= Alength; ++i) {
+            if (vc->sc->bp_storage[i]) {
+              for (unsigned int k = 1; k < Alength; k++) {
+                unsigned int j = i + k;
+
+                if (j > Alength)
+                  break;
+
+                int e = get_stored_bp_contributions(vc->sc->bp_storage[i], j);
+
+                if (e != 0) {
+                  vrna_sc_add_bp(fc_AA, i, j, (FLT_OR_DBL)e / 100., VRNA_OPTION_DEFAULT);
+                  vrna_sc_add_bp(fc_AA, Alength + i, Alength + j, (FLT_OR_DBL)e / 100., VRNA_OPTION_DEFAULT);
+                }
+              }
+            }
+          }
+        }
+
+        if (vc->sc->energy_stack) {
+          for (unsigned int i = 1; i <= Alength; ++i) {
+            if (vc->sc->energy_stack[i] != 0) {
+              vrna_sc_add_stack(fc_AA, i, (FLT_OR_DBL)vc->sc->energy_stack[i] / 100., VRNA_OPTION_DEFAULT);
+              vrna_sc_add_stack(fc_AA, Alength + i, (FLT_OR_DBL)vc->sc->energy_stack[i] / 100., VRNA_OPTION_DEFAULT);
+            }
+          }
+        }
+      }
 
       double                mfe_AA = vrna_mfe(fc_AA, ss_AA);
       vrna_mx_mfe_free(fc_AA);
@@ -1085,6 +1138,45 @@ process_record(struct record_data *record)
 
       char                  *ss_BB  = (char *)vrna_alloc(sizeof(char) * (2 * Blength + 1));
       vrna_fold_compound_t  *fc_BB  = vrna_fold_compound(seq_BB, &(opt->md), VRNA_OPTION_DEFAULT);
+
+      /* extract soft constraints from concatenated input above, if any */
+      if (vc->sc) {
+        if (vc->sc->up_storage) {
+          for (unsigned int i = Alength + 1; i <= Alength + Blength; ++i) {
+            vrna_sc_add_up(fc_BB, i - Alength, (FLT_OR_DBL)vc->sc->up_storage[i] / 100., VRNA_OPTION_DEFAULT);
+            vrna_sc_add_up(fc_BB, Blength + i - Alength, (FLT_OR_DBL)vc->sc->up_storage[i] / 100., VRNA_OPTION_DEFAULT);
+          }
+        }
+
+        if (vc->sc->bp_storage) {
+          for (unsigned int i = Alength + 1; i <= Alength + Blength; ++i) {
+            if (vc->sc->bp_storage[i]) {
+              for (unsigned int k = 1; k < Blength; k++) {
+                unsigned int j = i + k;
+
+                if (j > Alength + Blength)
+                  break;
+
+                int e = get_stored_bp_contributions(vc->sc->bp_storage[i], j);
+
+                if (e != 0) {
+                  vrna_sc_add_bp(fc_BB, i - Alength, j - Alength, (FLT_OR_DBL)e / 100., VRNA_OPTION_DEFAULT);
+                  vrna_sc_add_bp(fc_BB, Blength + i - Alength, Blength + j - Alength, (FLT_OR_DBL)e / 100., VRNA_OPTION_DEFAULT);
+                }
+              }
+            }
+          }
+        }
+
+        if (vc->sc->energy_stack) {
+          for (unsigned int i = Alength + 1; i <= Alength + Blength; ++i) {
+            if (vc->sc->energy_stack[i] != 0) {
+              vrna_sc_add_stack(fc_BB, i - Alength, (FLT_OR_DBL)vc->sc->energy_stack[i] / 100., VRNA_OPTION_DEFAULT);
+              vrna_sc_add_stack(fc_BB, Blength + i - Alength, (FLT_OR_DBL)vc->sc->energy_stack[i] / 100., VRNA_OPTION_DEFAULT);
+            }
+          }
+        }
+      }
 
       double                mfe_BB = vrna_mfe(fc_BB, ss_BB);
       vrna_mx_mfe_free(fc_BB);
@@ -1648,3 +1740,30 @@ read_concentrations(FILE *fp)
   startc[i] = startc[i + 1] = 0;
   return startc;
 }
+
+
+PRIVATE INLINE int
+get_stored_bp_contributions(vrna_sc_bp_storage_t  *container,
+                            unsigned int          j)
+{
+  unsigned int  cnt;
+  int           e;
+
+  e = 0;
+
+  /* go through list of constraints for current position i */
+  for (cnt = 0; container[cnt].interval_start != 0; cnt++) {
+    if (container[cnt].interval_start > j)
+      break; /* only constraints for pairs (i,q) with q > j left */
+
+    if (container[cnt].interval_end < j)
+      continue; /* constraint for pairs (i,q) with q < j */
+
+    /* constraint has interval [p,q] with p <= j <= q */
+    e += container[cnt].e;
+  }
+
+  return e;
+}
+
+
