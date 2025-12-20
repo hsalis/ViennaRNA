@@ -36,6 +36,7 @@ typedef struct vrna_hc_depot_s vrna_hc_depot_t;
 
 #include <ViennaRNA/fold_compound.h>
 #include <ViennaRNA/constraints/basic.h>
+#include <ViennaRNA/datastructures/sparse_mx.h>
 
 /**
  * @brief Callback to evaluate whether or not a particular decomposition step is contributing to the solution space
@@ -253,13 +254,19 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
    | VRNA_CONSTRAINT_DB_GQUAD \
   )
 
+
+/**
+ *  @brief  Constraint context flag that forbids a nucleotide or base pair to appear in any loop
+ */
+#define VRNA_CONSTRAINT_CONTEXT_NONE          (unsigned char)0
+
 /**
  *  @brief  Hard constraints flag, base pair in the exterior loop
  *
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_EXT_LOOP      (unsigned char)0x01
+#define VRNA_CONSTRAINT_CONTEXT_EXT_LOOP      (unsigned char)(1 << 0)
 
 /**
  *  @brief  Hard constraints flag, base pair encloses hairpin loop
@@ -267,7 +274,7 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_HP_LOOP       (unsigned char)0x02
+#define VRNA_CONSTRAINT_CONTEXT_HP_LOOP       (unsigned char)(1 << 1)
 
 /**
  *  @brief  Hard constraints flag, base pair encloses an internal loop
@@ -275,7 +282,7 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_INT_LOOP      (unsigned char)0x04
+#define VRNA_CONSTRAINT_CONTEXT_INT_LOOP      (unsigned char)(1 << 2)
 
 /**
  *  @brief  Hard constraints flag, base pair encloses a multi branch loop
@@ -283,7 +290,7 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_INT_LOOP_ENC  (unsigned char)0x08
+#define VRNA_CONSTRAINT_CONTEXT_INT_LOOP_ENC  (unsigned char)(1 << 3)
 
 /**
  *  @brief  Hard constraints flag, base pair is enclosed in an internal loop
@@ -291,7 +298,7 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_MB_LOOP       (unsigned char)0x10
+#define VRNA_CONSTRAINT_CONTEXT_MB_LOOP       (unsigned char)(1 << 4)
 
 /**
  *  @brief  Hard constraints flag, base pair is enclosed in a multi branch loop
@@ -299,23 +306,17 @@ DEPRECATED(typedef unsigned char (vrna_callback_hc_evaluate)(int i,
  *  @ingroup  hard_constraints
  *
  */
-#define VRNA_CONSTRAINT_CONTEXT_MB_LOOP_ENC   (unsigned char)0x20
+#define VRNA_CONSTRAINT_CONTEXT_MB_LOOP_ENC   (unsigned char)(1 << 5)
 
 /**
  *  @brief  Hard constraint flag to indicate enforcement of constraints
  */
-#define VRNA_CONSTRAINT_CONTEXT_ENFORCE       (unsigned char)0x40
+#define VRNA_CONSTRAINT_CONTEXT_ENFORCE       (unsigned char)(1 << 6)
 
 /**
  *  @brief  Hard constraint flag to indicate not to remove base pairs that conflict with a given constraint
  */
-#define VRNA_CONSTRAINT_CONTEXT_NO_REMOVE     (unsigned char)0x80
-
-
-/**
- *  @brief  Constraint context flag that forbids a nucleotide or base pair to appear in any loop
- */
-#define VRNA_CONSTRAINT_CONTEXT_NONE          (unsigned char)0
+#define VRNA_CONSTRAINT_CONTEXT_NO_REMOVE     (unsigned char)(1 << 7)
 
 /**
  *  @brief  Constraint context flag indicating base pairs that close any loop
@@ -736,6 +737,10 @@ int
 vrna_hc_add_from_db(vrna_fold_compound_t  *fc,
                     const char            *constraint,
                     unsigned int          options);
+
+
+vrna_smx_csr(vrna_uchar) *
+vrna_hc_nondefaults(vrna_fold_compound_t *fc);
 
 
 #ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY

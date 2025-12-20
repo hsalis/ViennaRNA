@@ -77,6 +77,7 @@
 
 #define GENERIC_SMX_CSR_PTR_FN_DEFINE(SMX_CSR_PTR, FN_NAME) \
   _Generic((SMX_CSR_PTR), \
+      vrna_smx_csr_vrna_uchar_t *: (vrna_smx_csr_vrna_uchar ## _ ## FN_NAME), \
       vrna_smx_csr_int_t *: (vrna_smx_csr_int ## _ ## FN_NAME), \
       vrna_smx_csr_float_t *: (vrna_smx_csr_float ## _ ## FN_NAME), \
       vrna_smx_csr_double_t *: (vrna_smx_csr_double ## _ ## FN_NAME), \
@@ -100,6 +101,9 @@
 #endif
 
 /* Below follows a list of sparse matrix declarations for different data types */
+typedef unsigned char   vrna_uchar;
+
+VRNA_SMX_CSR_DECLARE_ALL(vrna_uchar)
 VRNA_SMX_CSR_DECLARE_ALL(int)
 VRNA_SMX_CSR_DECLARE_ALL(float)
 VRNA_SMX_CSR_DECLARE_ALL(double)

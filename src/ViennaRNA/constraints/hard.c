@@ -16,6 +16,7 @@
 #include "ViennaRNA/params/constants.h" /* defines MINPSCORE */
 #include "ViennaRNA/fold_vars.h"
 #include "ViennaRNA/utils/basic.h"
+#include "ViennaRNA/datastructures/sparse_mx.h"
 #include "ViennaRNA/sequences/alignments.h"
 #include "ViennaRNA/utils/log.h"
 #include "ViennaRNA/io/file_formats.h"
@@ -698,6 +699,42 @@ vrna_hc_add_from_db(vrna_fold_compound_t  *vc,
   }
 
   return ret;
+}
+
+
+PUBLIC vrna_smx_csr(vrna_uchar) *
+vrna_hc_nondefaults(vrna_fold_compound_t *fc)
+{
+  vrna_smx_csr(vrna_uchar) *mx_nd = NULL;
+
+  if ((fc) &&
+      (fc->hc)) {
+    unsigned char nd  = 0;
+    unsigned int  n   = fc->length;
+
+    for (unsigned int i = 1; i <= n; ++i) {
+      unsigned int ni = n * i;
+
+      if (fc->hc->mx[ni + i] != VRNA_CONSTRAINT_CONTEXT_ALL_LOOPS) {
+        vrna_smx_csr_insert(mx_nd, i, i, fc->hc->mx[ni + i]);
+        nd = 1;
+      }
+
+      for (unsigned int j = i + 1; j <= n; ++j)
+        if (fc->hc->mx[ni + j] != default_pair_constraint(fc, i, j)) {
+          vrna_smx_csr_insert(mx_nd, i, j, fc->hc->mx[ni + j]);
+          nd = 1;
+        }
+    }
+
+    /* return NULL if there are no non-default hard constraints */
+    if (nd == 0) {
+      vrna_smx_csr_free(mx_nd);
+      mx_nd = NULL;
+    }
+  }
+
+  return mx_nd;
 }
 
 

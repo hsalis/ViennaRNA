@@ -1079,6 +1079,47 @@ process_record(struct record_data *record)
 
       vrna_fold_compound_t  *fc_AA  = vrna_fold_compound(seq_AA, &(opt->md), VRNA_OPTION_DEFAULT);
 
+      /* extract hard constraints from concatenated input above, if any non-defaults */
+      if (vc->hc) {
+        vrna_smx_csr(vrna_uchar) *hc_nondefaults = vrna_hc_nondefaults(vc);
+
+        if (hc_nondefaults) {
+          /* single nucleotide constraints first */
+          for (unsigned int i = 1; i <= Alength; ++i) {
+            unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                        i,
+                                                        i,
+                                                        VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+            if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+              vrna_hc_add_up(fc_AA, i, constraint);
+              vrna_hc_add_up(fc_AA, Alength + i, constraint);
+            }
+          }
+
+          /* base pair constraints next */
+          for (unsigned int i = 1; i <= Alength; ++i) {
+            for (unsigned int k = 1; k < Alength; k++) {
+              unsigned int j = i + k;
+
+              if (j > Alength)
+                break;
+
+              unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                          i,
+                                                          j,
+                                                          VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+              if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+                /* insert constraint as plain as possible */
+                vrna_hc_add_bp(fc_AA, i, j, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+                vrna_hc_add_bp(fc_AA, Alength + i, Alength + j, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+              }
+            }
+          }
+
+          vrna_smx_csr_free(hc_nondefaults);
+        }
+      }
+
       /* extract soft constraints from concatenated input above, if any */
       if (vc->sc) {
         if (vc->sc->up_storage) {
@@ -1138,6 +1179,47 @@ process_record(struct record_data *record)
 
       char                  *ss_BB  = (char *)vrna_alloc(sizeof(char) * (2 * Blength + 1));
       vrna_fold_compound_t  *fc_BB  = vrna_fold_compound(seq_BB, &(opt->md), VRNA_OPTION_DEFAULT);
+
+      /* extract hard constraints from concatenated input above, if any non-defaults */
+      if (vc->hc) {
+        vrna_smx_csr(vrna_uchar) *hc_nondefaults = vrna_hc_nondefaults(vc);
+
+        if (hc_nondefaults) {
+          /* single nucleotide constraints first */
+          for (unsigned int i = Alength + 1; i <= Alength + Blength; ++i) {
+            unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                        i,
+                                                        i,
+                                                        VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+            if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+              vrna_hc_add_up(fc_AA, i - Alength, constraint);
+              vrna_hc_add_up(fc_AA, Blength + i - Alength, constraint);
+            }
+          }
+
+          /* base pair constraints next */
+          for (unsigned int i = Alength + 1; i <= Alength + Blength; ++i) {
+            for (unsigned int k = 1; k < Blength; k++) {
+              unsigned int j = i + k;
+
+              if (j > Alength + Blength)
+                break;
+
+              unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                          i,
+                                                          j,
+                                                          VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+              if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+                /* insert constraint as plain as possible */
+                vrna_hc_add_bp(fc_AA, i - Alength, j - Alength, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+                vrna_hc_add_bp(fc_AA, Blength + i - Alength, Blength + j - Alength, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+              }
+            }
+          }
+
+          vrna_smx_csr_free(hc_nondefaults);
+        }
+      }
 
       /* extract soft constraints from concatenated input above, if any */
       if (vc->sc) {

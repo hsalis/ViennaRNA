@@ -16,6 +16,7 @@
 #include "ViennaRNA/utils/basic.h"
 #include "ViennaRNA/backtrack/global.h"
 #include "ViennaRNA/constraints/soft.h"
+#include "ViennaRNA/datastructures/sparse_mx.h"
 #include "ViennaRNA/mfe/global.h"
 
 
@@ -161,6 +162,47 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
     vrna_fold_compound_t *fc2 = vrna_fold_compound(s2,
                                                    &(vc->params->model_details),
                                                    VRNA_OPTION_DEFAULT);
+
+    /* extract hard constraints for second sequence, if any non-defaults */
+    if (vc->hc) {
+      vrna_smx_csr(vrna_uchar) *hc_nondefaults = vrna_hc_nondefaults(vc);
+
+      if (hc_nondefaults) {
+        /* single nucleotide constraints first */
+        for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+          unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                      i,
+                                                      i,
+                                                      VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+          if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+            vrna_hc_add_up(fc2, i - l1, constraint);
+            vrna_hc_add_up(fc2, l2 + i - l1, constraint);
+          }
+        }
+
+        /* base pair constraints next */
+        for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+          for (unsigned int k = 1; k < l2; k++) {
+            unsigned int j = i + k;
+
+            if (j > l1 + l2)
+              break;
+
+            unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
+                                                        i,
+                                                        j,
+                                                        VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+            if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
+              /* insert constraint as plain as possible */
+              vrna_hc_add_bp(fc2, i - l1, j - l1, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+              vrna_hc_add_bp(fc2, l2 + i - l1, l2 + j - l1, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+            }
+          }
+        }
+
+        vrna_smx_csr_free(hc_nondefaults);
+      }
+    }
 
     /* extract soft constraints for second sequence, if any */
     if (vc->sc) {
