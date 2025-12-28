@@ -215,6 +215,36 @@ off
 hidden
 
 
+option  "benchmark" -
+"Perform a prediction performance test (benchmark) based on reference structures taken from the input.\n\n"
+flag
+off
+hidden
+
+
+option  "bm-output" -
+"Store the performance benchmark results in a file.\n\n"
+string
+typestr="filename"
+optional
+hidden
+
+
+option  "bm-output-append" -
+"Append performance benchmark data to a file instead of overwriting already existing content.\n\n"
+flag
+off
+dependon="bm-output"
+hidden
+
+
+option  "bm-rm-pk" -
+"Remove pseudo-knots from the reference structure before computing benchmark.\n\n"
+flag
+off
+hidden
+
+
 section "Algorithms"
 sectiondesc="Select additional algorithms which should be included in the calculations.\n\n"
 

@@ -37,6 +37,7 @@
 #include "ViennaRNA/params/io.h"
 #include "ViennaRNA/structures/centroid.h"
 #include "ViennaRNA/structures/mea.h"
+#include "ViennaRNA/structures/benchmark.h"
 #include "ViennaRNA/params/basic.h"
 #include "ViennaRNA/constraints/basic.h"
 #include "ViennaRNA/constraints/hard.h"
@@ -100,6 +101,13 @@ struct options {
   char            **shape_files;
   char            *shape_method;
   int             *shape_file_association;
+
+  unsigned int    benchmark;
+  FILE            *benchmark_file;
+  double          benchmark_tp;
+  double          benchmark_fp;
+  double          benchmark_tn;
+  double          benchmark_fn;
 
   int             jobs;
   int             keep_order;
@@ -277,6 +285,13 @@ init_default_options(struct options *opt)
   opt->shape_files            = NULL;
   opt->shape_file_association = NULL;
   opt->shape_method           = NULL;
+
+  opt->benchmark          = 0;
+  opt->benchmark_file     = stdout;
+  opt->benchmark_tp       = 0.;
+  opt->benchmark_fp       = 0.;
+  opt->benchmark_tn       = 0.;
+  opt->benchmark_fn       = 0.;
 
   opt->jobs               = 1;
   opt->keep_order         = 1;
@@ -543,6 +558,43 @@ main(int  argc,
   if (args_info.sci_given)
     opt.sci = 1;
 
+  if (args_info.benchmark_given) {
+    opt.benchmark = 1;
+
+    if (args_info.bm_output_given) {
+      char *bfname = vrna_filename_sanitize(args_info.bm_output_arg, opt.filename_delim);
+
+      char *mode = (args_info.bm_output_append_given) ? "a" : "w";
+
+      if (!(opt.benchmark_file = fopen(bfname, mode))) {
+        vrna_log_error("Failed to open benchmark file \"%s\" for %s",
+                       bfname,
+                       (args_info.bm_output_append_given) ? "appending" : "writing");
+        exit(EXIT_FAILURE);
+      }
+
+      free(bfname);
+    }
+
+    if (args_info.bm_rm_pk_given)
+      opt.benchmark |= 1 << 2;
+
+    fprintf(opt.benchmark_file,
+            "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+            "ID",
+            "TP",
+            "FP",
+            "TN",
+            "FN",
+            "TPR",
+            "PPV",
+            "MCC",
+            "F1");
+
+    fflush(opt.benchmark_file);
+
+  }
+
   /* alignment file name(s) given as unnamed option? */
   input_files = collect_unnamed_options(&args_info, &num_input);
 
@@ -706,6 +758,32 @@ main(int  argc,
    # post processing
    ################################################
    */
+  if (opt.benchmark) {
+    vrna_score_t scores = vrna_score_from_confusion_matrix(opt.benchmark_tp,
+                                                           opt.benchmark_tn,
+                                                           opt.benchmark_fp,
+                                                           opt.benchmark_fn);
+
+    THREADSAFE_FILE_OUTPUT(({
+      fprintf(opt.benchmark_file,
+              "%s\t%.1f\t%.1f\t%.1f\t%.1f\t%f\t%f\t%f\t%f\n",
+              "TOTAL",
+              scores.TP,
+              scores.FP,
+              scores.TN,
+              scores.FN,
+              scores.TPR,
+              scores.PPV,
+              scores.MCC,
+              scores.F1);
+    }))
+
+    fflush(opt.benchmark_file);
+
+    if (opt.benchmark_file != stdout)
+      fclose(opt.benchmark_file);
+  }
+
   vrna_ostream_free(opt.output_queue);
 
 
@@ -895,7 +973,7 @@ process_input(FILE            *input_stream,
 static void
 process_record(struct record_data *record)
 {
-  char                  **alignment, *consensus_sequence, *mfe_structure;
+  char                  **alignment, *consensus_sequence, *mfe_structure, *ref_structure;
   unsigned int          n, i, n_seq;
   double                min_en, real_en, cov_en;
   struct options        *opt;
@@ -904,8 +982,9 @@ process_record(struct record_data *record)
 
   o_stream = (struct output_stream *)vrna_alloc(sizeof(struct output_stream));
 
-  opt   = record->options;
-  n_seq = record->n_seq;
+  opt           = record->options;
+  n_seq         = record->n_seq;
+  ref_structure = NULL;
 
   /* construct output file names */
   char  *filename_plot  = get_filename(record->MSA_ID, "ss.ps", "alirna.ps", opt);
@@ -970,8 +1049,10 @@ process_record(struct record_data *record)
                        vrna_aln_consensus_sequence((const char **)alignment, &(opt->md));
 
   /* put header + sequence into output string stream */
-  vrna_cstr_print_fasta_header(o_stream->data, record->MSA_ID);
-  vrna_cstr_printf(o_stream->data, "%s\n", consensus_sequence);
+  if (!opt->benchmark) {
+    vrna_cstr_print_fasta_header(o_stream->data, record->MSA_ID);
+    vrna_cstr_printf(o_stream->data, "%s\n", consensus_sequence);
+  }
 
   mfe_structure = (char *)vrna_alloc(sizeof(char) * (n + 1));
   min_en        = vrna_mfe(vc, mfe_structure);
@@ -989,55 +1070,57 @@ process_record(struct record_data *record)
   real_en = vrna_eval_structure(vc, mfe_structure);
   cov_en  = vrna_eval_covar_structure(vc, mfe_structure);
 
-  if (opt->sci) {
-    double sci = compute_sci((const char **)alignment, &(opt->md), min_en);
+  if (!opt->benchmark) {
+    if (opt->sci) {
+      double sci = compute_sci((const char **)alignment, &(opt->md), min_en);
 
-    if (opt->shape) {
-      vrna_cstr_printf_structure(o_stream->data,
-                                 mfe_structure,
-                                 record->tty ?
-                                 "\n minimum free energy = %6.2f kcal/mol "
-                                 "(%6.2f + %6.2f + %6.2f)\n SCI = %2.4f" :
-                                 " (%6.2f = %6.2f + %6.2f + %6.2f) [sci = %2.4f]",
-                                 DBL_ROUND(min_en, 2),
-                                 DBL_ROUND(real_en, 2),
-                                 DBL_ROUND(-cov_en, 2),
-                                 DBL_ROUND(min_en - real_en + cov_en, 2),
-                                 DBL_ROUND(sci, 4));
+      if (opt->shape) {                                                             
+        vrna_cstr_printf_structure(o_stream->data,                                  
+                                   mfe_structure,                                   
+                                   record->tty ?                                    
+                                   "\n minimum free energy = %6.2f kcal/mol "       
+                                   "(%6.2f + %6.2f + %6.2f)\n SCI = %2.4f" :        
+                                   " (%6.2f = %6.2f + %6.2f + %6.2f) [sci = %2.4f]",
+                                   DBL_ROUND(min_en, 2),                            
+                                   DBL_ROUND(real_en, 2),                           
+                                   DBL_ROUND(-cov_en, 2),                           
+                                   DBL_ROUND(min_en - real_en + cov_en, 2),         
+                                   DBL_ROUND(sci, 4));                              
+      } else {                                                                      
+        vrna_cstr_printf_structure(o_stream->data,                                  
+                                   mfe_structure,                                   
+                                   record->tty ?                                    
+                                   "\n minimum free energy = %6.2f kcal/mol "       
+                                   "(%6.2f + %6.2f)\n SCI = %2.4f" :                
+                                   " (%6.2f = %6.2f + %6.2f) [sci = %2.4f]",        
+                                   DBL_ROUND(min_en, 2),                            
+                                   DBL_ROUND(real_en, 2),                           
+                                   DBL_ROUND(min_en - real_en, 2),                  
+                                   DBL_ROUND(sci, 4));                              
+      }                                                                             
     } else {
-      vrna_cstr_printf_structure(o_stream->data,
-                                 mfe_structure,
-                                 record->tty ?
-                                 "\n minimum free energy = %6.2f kcal/mol "
-                                 "(%6.2f + %6.2f)\n SCI = %2.4f" :
-                                 " (%6.2f = %6.2f + %6.2f) [sci = %2.4f]",
-                                 DBL_ROUND(min_en, 2),
-                                 DBL_ROUND(real_en, 2),
-                                 DBL_ROUND(min_en - real_en, 2),
-                                 DBL_ROUND(sci, 4));
-    }
-  } else {
-    if (opt->shape) {
-      vrna_cstr_printf_structure(o_stream->data,
-                                 mfe_structure,
-                                 record->tty ?
-                                 "\n minimum free energy = %6.2f kcal/mol "
-                                 "(%6.2f + %6.2f + %6.2f)" :
-                                 " (%6.2f = %6.2f + %6.2f + %6.2f)",
-                                 DBL_ROUND(min_en, 2),
-                                 DBL_ROUND(real_en, 2),
-                                 DBL_ROUND(-cov_en, 2),
-                                 DBL_ROUND(min_en - real_en + cov_en, 2));
-    } else {
-      vrna_cstr_printf_structure(o_stream->data,
-                                 mfe_structure,
-                                 record->tty ?
-                                 "\n minimum free energy = %6.2f kcal/mol "
-                                 "(%6.2f + %6.2f)" :
-                                 " (%6.2f = %6.2f + %6.2f)",
-                                 DBL_ROUND(min_en, 2),
-                                 DBL_ROUND(real_en, 2),
-                                 DBL_ROUND(min_en - real_en, 2));
+      if (opt->shape) {
+        vrna_cstr_printf_structure(o_stream->data,
+                                   mfe_structure,
+                                   record->tty ?
+                                   "\n minimum free energy = %6.2f kcal/mol "
+                                   "(%6.2f + %6.2f + %6.2f)" :
+                                   " (%6.2f = %6.2f + %6.2f + %6.2f)",
+                                   DBL_ROUND(min_en, 2),
+                                   DBL_ROUND(real_en, 2),
+                                   DBL_ROUND(-cov_en, 2),
+                                   DBL_ROUND(min_en - real_en + cov_en, 2));
+      } else {
+        vrna_cstr_printf_structure(o_stream->data,
+                                   mfe_structure,
+                                   record->tty ?
+                                   "\n minimum free energy = %6.2f kcal/mol "
+                                   "(%6.2f + %6.2f)" :
+                                   " (%6.2f = %6.2f + %6.2f)",
+                                   DBL_ROUND(min_en, 2),
+                                   DBL_ROUND(real_en, 2),
+                                   DBL_ROUND(min_en - real_en, 2));
+      }
     }
   }
 
@@ -1069,7 +1152,88 @@ process_record(struct record_data *record)
   /* free mfe arrays */
   vrna_mx_mfe_free(vc);
 
-  if (opt->pf) {
+  if (opt->benchmark) {
+    ref_structure = vrna_db_from_WUSS(record->consensus_structure);
+
+    short *pt = vrna_ptable(mfe_structure);
+    short *pt_gold = vrna_ptable_from_string(ref_structure, VRNA_BRACKETS_ANY);
+
+    if (opt->benchmark & (1 << 2)) {
+      /* remove pseudoknots */
+      short *tmp = vrna_pt_pk_remove(pt_gold, 0);
+      free(pt_gold);
+      pt_gold = tmp;
+    }
+
+#if 0
+    if (opt->benchmark & (1 << 3)) {
+      /* remove non-canonical basepairs */
+      for (unsigned int i = 1; i <= vc->length; ++i) {
+        if (pt_gold[i] > i) {
+          unsigned int j = pt_gold[i];
+
+          /* remove too-short hairpins */
+          if ((j - i) > 3) {
+            unsigned int type = vrna_get_ptype_md(vc->sequence_encoding2[i],
+                                                  vc->sequence_encoding2[j],
+                                                  &(vc->params->model_details));
+            if ((type == 0) ||
+                (type == 7)) {
+              pt_gold[j] = pt_gold[i] = 0;
+            }
+          } else {
+            pt_gold[j] = pt_gold[i] = 0;
+          }
+        }
+      }
+    }
+#endif
+
+    vrna_score_t scores = vrna_compare_structure_pt(pt_gold, pt, 0);
+
+    ATOMIC_BLOCK({
+      opt->benchmark_tp += scores.TP;
+      opt->benchmark_fp += scores.FP;
+      opt->benchmark_tn += scores.TN;
+      opt->benchmark_fn += scores.FN;
+    })
+
+    if (opt->benchmark_file != stdout) {
+      vrna_cstr_print_fasta_header(o_stream->data, record->MSA_ID);
+      vrna_cstr_printf(o_stream->data, "%s\n", consensus_sequence);
+
+      char *ref_struct_processed = vrna_db_from_ptable(pt_gold);
+      vrna_cstr_printf_structure(o_stream->data,
+                                 mfe_structure,
+                                 " (%6.2f) [predition]",
+                                 min_en);
+      vrna_cstr_printf_structure(o_stream->data,
+                                 ref_struct_processed,
+                                 " (%6.2f) [reference]",
+                                 vrna_eval_structure(vc, ref_struct_processed));
+      free(ref_struct_processed);
+    }
+
+    THREADSAFE_FILE_OUTPUT(({
+      fprintf(opt->benchmark_file,
+              "%s\t%.1f\t%.1f\t%.1f\t%.1f\t%f\t%f\t%f\t%f\n",
+              record->MSA_ID,
+              scores.TP,
+              scores.FP,
+              scores.TN,
+              scores.FN,
+              scores.TPR,
+              scores.PPV,
+              scores.MCC,
+              scores.F1);
+    }))
+
+    fflush(opt->benchmark_file);
+
+    free(pt);
+    free(pt_gold);
+
+  } else if (opt->pf) {
     double  energy;
     char    *pairing_propensity;
 
@@ -1185,6 +1349,7 @@ process_record(struct record_data *record)
 
   free(consensus_sequence);
   free(mfe_structure);
+  free(ref_structure);
   free(filename_plot);
   free(filename_dot);
   free(filename_aln);
