@@ -8,28 +8,29 @@
 #include "ViennaRNA/structures/benchmark.h"
 
 PUBLIC vrna_score_t
-vrna_score_from_confusion_matrix(int  TP,
-                                 int  TN,
-                                 int  FP,
-                                 int  FN)
+vrna_score_from_confusion_matrix(double TP,
+                                 double TN,
+                                 double FP,
+                                 double FN)
 {
   vrna_score_t score;
 
-  score.TP  = TP;
-  score.TN  = TN;
-  score.FP  = FP;
-  score.FN  = FN;
+  score.TP  = TP > 0. ? TP : 0.;
+  score.TN  = TN > 0. ? TN : 0.;
+  score.FP  = FP > 0. ? FP : 0.;
+  score.FN  = FN > 0. ? FN : 0.;
 
-  score.TPR = TP + FN > 0 ? (float)TP / (TP + FN) : 0.0;
-  score.PPV = TP + FP > 0 ? (float)TP / (TP + FP) : 0.0;
-  score.FPR = TN + FP > 0 ? (float)FP / (TN + FP) : 0.0;
-  score.FOR = TN + FN > 0 ? (float)FN / (TN + FN) : 0.0;
-  score.FDR = 1 - score.PPV;
-  score.FNR = 1 - score.TPR;
-  score.TNR = 1 - score.FPR;
-  score.NPV = 1 - score.FOR;
-  score.F1  = score.TPR + score.PPV >
-              0 ? (float)2 * score.TPR * score.PPV / (score.TPR + score.PPV) : 0.0;
+  score.TPR = (TP + FN) > 0 ? TP / (TP + FN) : 0.;
+  score.PPV = (TP + FP) > 0 ? TP / (TP + FP) : 0.;
+  score.FPR = (TN + FP) > 0 ? FP / (TN + FP) : 0.;
+  score.FOR = (TN + FN) > 0 ? FN / (TN + FN) : 0.;
+  score.FDR = 1. - score.PPV;
+  score.FNR = 1. - score.TPR;
+  score.TNR = 1. - score.FPR;
+  score.NPV = 1. - score.FOR;
+  score.F1  = (score.TPR + score.PPV) > 0 ?
+              2. * score.TPR * score.PPV / (score.TPR + score.PPV) :
+              0.;
 
   score.MCC = sqrt(score.PPV * score.TPR * score.TNR * score.NPV) -
               sqrt(score.FDR * score.FNR * score.FPR * score.FOR);
@@ -43,11 +44,12 @@ vrna_compare_structure_pt(const short *pt_gold,
                           const short *pt_other,
                           int         fuzzy)
 {
-  int TP = 0, TN = 0, FP = 0, FN = 0;
+  double        TP = 0., TN = 0., FP = 0., FN = 0.;
+
   /* number of false positive, but compatible pairs */
-  int compatible = 0;
+  int           compatible = 0;
   /* count the number of base pairs in pt_gold, and pt_other */
-  int bps_gold = 0, bps_other = 0;
+  unsigned int  bps_gold = 0, bps_other = 0;
 
   /* Hard coded fuzzy as 0 */
   fuzzy = 0;
@@ -129,14 +131,14 @@ vrna_compare_structure_pt(const short *pt_gold,
       if ((is_inconsistent == 0) && (is_contradicting == 0))
         compatible++;
 
-      FP++;
+      FP += 1.;
     } else {
-      TP++;
+      TP += 1.;
     }
   }
 
-  FN  = bps_gold;
-  TN  = (int)(0.5 * (pt_gold[0] * (pt_gold[0] - 1))) - TP - FP - FN;
+  FN  = (double)bps_gold;
+  TN  = (0.5 * ((double)pt_gold[0] * ((double)pt_gold[0] - 1))) - TP - FP - FN;
 
   return vrna_score_from_confusion_matrix(TP, TN, FP, FN);
 }

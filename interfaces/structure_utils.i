@@ -834,28 +834,28 @@ double  my_dist_mountain(std::string str1, std::string str2, unsigned int p = 1)
 %newobject vrna_score_t::__str__;
 
 typedef struct {
-  int TP;
-  int TN;
-  int FP;
-  int FN;
-  float TPR;
-  float PPV;
-  float FPR;
-  float FOR;
-  float TNR;
-  float FDR;
-  float FNR;
-  float NPV;
-  float F1;
-  float MCC;
+  double TP;
+  double TN;
+  double FP;
+  double FN;
+  double TPR;
+  double PPV;
+  double FPR;
+  double FOR;
+  double TNR;
+  double FDR;
+  double FNR;
+  double NPV;
+  double F1;
+  double MCC;
 } vrna_score_t;
 
 %extend vrna_score_t {
 
-    vrna_score_t(int TP=0,
-                 int TN=0,
-                 int FP=0,
-                 int FN=0)
+    vrna_score_t(double TP=0.,
+                 double TN=0.,
+                 double FP=0.,
+                 double FN=0.)
     {
       vrna_score_t *score;
 

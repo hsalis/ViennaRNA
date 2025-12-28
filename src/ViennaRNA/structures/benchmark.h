@@ -28,20 +28,20 @@ typedef struct vrna_score_s vrna_score_t;
  *
  */
 struct vrna_score_s {
-  int   TP;             /**< @brief True Positive count */
-  int   TN;             /**< @brief True Negative count */
-  int   FP;             /**< @brief False Positive count */
-  int   FN;             /**< @brief False Negative count */
-  float TPR;            /**< @brief True Positive Rate */
-  float PPV;            /**< @brief Positive Predictive Value */
-  float FPR;            /**< @brief False Positive Rate */
-  float FOR;            /**< @brief False Omission Rate */
-  float TNR;            /**< @brief True Negative Rate */
-  float FDR;            /**< @brief False Discovery Rate */
-  float FNR;            /**< @brief False Negative Rate  */
-  float NPV;            /**< @brief Negative Predictive Value */
-  float F1;             /**< @brief F1 Score */
-  float MCC;            /**< @brief Matthews Correlation Coefficient */
+  double  TP;             /**< @brief True Positive count */
+  double  TN;             /**< @brief True Negative count */
+  double  FP;             /**< @brief False Positive count */
+  double  FN;             /**< @brief False Negative count */
+  double  TPR;            /**< @brief True Positive Rate */
+  double  PPV;            /**< @brief Positive Predictive Value */
+  double  FPR;            /**< @brief False Positive Rate */
+  double  FOR;            /**< @brief False Omission Rate */
+  double  TNR;            /**< @brief True Negative Rate */
+  double  FDR;            /**< @brief False Discovery Rate */
+  double  FNR;            /**< @brief False Negative Rate  */
+  double  NPV;            /**< @brief Negative Predictive Value */
+  double  F1;             /**< @brief F1 Score */
+  double  MCC;            /**< @brief Matthews Correlation Coefficient */
 };
 
 
@@ -55,10 +55,10 @@ struct vrna_score_s {
  *  @return  The score data structure to write
  */
 vrna_score_t
-vrna_score_from_confusion_matrix(int  TP,
-                                 int  TN,
-                                 int  FP,
-                                 int  FN);
+vrna_score_from_confusion_matrix(double TP,
+                                 double TN,
+                                 double FP,
+                                 double FN);
 
 
 /**
