@@ -5,7 +5,28 @@ Below, you'll find a list of notable changes for each version of the ViennaRNA P
 ## Version 2.7.x
 
 
-### [Unreleased](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.1...HEAD)
+### [Unreleased](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.2...HEAD)
+
+
+### [Version 2.7.2](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.1...v2.7.2)
+
+#### Programs
+  * Fix structure output in `RNAeval` for more than 2 interacting RNAs
+  * Fix wrong application of soft constraints to single sequences in `RNAcofold`
+  * Add `--benchmark` option for `RNAfold`
+  * Add `--benchmark` option for `RNAalifold`
+
+#### Library
+  * API: Fix wrong application of soft constraints to single sequences in `vrna_mfe_dimer()`
+  * API: Restore backward compatibility issues after early removal of `vrna_constraints_add_SHAPE()` and others
+  * API: Re-use energy parameters for successive `vrna_params()` / `vrna_exp_params()` calls if possible
+  * API: Add negative log probability method (information content) as generic probing data strategy
+  * API: Add `vrna_math_dbl_chain()` to allow for chaining `vrna_math_dbl*` functions
+  * API: Add function to allow for chaining probing data strategies
+  * API: Change structure benchmark numbers to `double` type
+
+#### Package
+  * Fix misplaced 'i' in rna_turner2004.par
 
 
 ### [Version 2.7.1](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.0...v2.7.1)
