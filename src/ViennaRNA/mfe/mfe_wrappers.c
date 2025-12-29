@@ -170,10 +170,17 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
       if (hc_nondefaults) {
         /* single nucleotide constraints first */
         for (unsigned int i = l1 + 1; i <= l1 + l2; ++i) {
+#ifndef VRNA_DISABLE_C11_FEATURES
           unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
                                                       i,
                                                       i,
                                                       VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+#else
+          unsigned char constraint = vrna_smx_csr_vrna_uchar_get(hc_nondefaults,
+                                                      i,
+                                                      i,
+                                                      VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+#endif
           if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
             vrna_hc_add_up(fc2, i - l1, constraint);
             vrna_hc_add_up(fc2, l2 + i - l1, constraint);
@@ -188,10 +195,17 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
             if (j > l1 + l2)
               break;
 
+#ifndef VRNA_DISABLE_C11_FEATURES
             unsigned char constraint = vrna_smx_csr_get(hc_nondefaults,
                                                         i,
                                                         j,
                                                         VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+#else
+            unsigned char constraint = vrna_smx_csr_vrna_uchar_get(hc_nondefaults,
+                                                        i,
+                                                        j,
+                                                        VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
+#endif
             if (constraint != VRNA_CONSTRAINT_CONTEXT_NO_REMOVE) {
               /* insert constraint as plain as possible */
               vrna_hc_add_bp(fc2, i - l1, j - l1, constraint | VRNA_CONSTRAINT_CONTEXT_NO_REMOVE);
@@ -200,7 +214,11 @@ vrna_mfe_dimer(vrna_fold_compound_t *vc,
           }
         }
 
+#ifndef VRNA_DISABLE_C11_FEATURES
         vrna_smx_csr_free(hc_nondefaults);
+#else
+        vrna_smx_csr_vrna_uchar_free(hc_nondefaults);
+#endif
       }
     }
 

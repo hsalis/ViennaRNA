@@ -712,24 +712,38 @@ vrna_hc_nondefaults(vrna_fold_compound_t *fc)
     unsigned char nd  = 0;
     unsigned int  n   = fc->length;
 
+    mx_nd = vrna_smx_csr_vrna_uchar_init(n + 1);
+
     for (unsigned int i = 1; i <= n; ++i) {
       unsigned int ni = n * i;
 
       if (fc->hc->mx[ni + i] != VRNA_CONSTRAINT_CONTEXT_ALL_LOOPS) {
+#ifndef VRNA_DISABLE_C11_FEATURES
         vrna_smx_csr_insert(mx_nd, i, i, fc->hc->mx[ni + i]);
+#else
+        vrna_smx_csr_vrna_uchar_insert(mx_nd, i, i, fc->hc->mx[ni + i]);
+#endif
         nd = 1;
       }
 
       for (unsigned int j = i + 1; j <= n; ++j)
         if (fc->hc->mx[ni + j] != default_pair_constraint(fc, i, j)) {
+#ifndef VRNA_DISABLE_C11_FEATURES
           vrna_smx_csr_insert(mx_nd, i, j, fc->hc->mx[ni + j]);
+#else
+          vrna_smx_csr_vrna_uchar_insert(mx_nd, i, j, fc->hc->mx[ni + j]);
+#endif
           nd = 1;
         }
     }
 
     /* return NULL if there are no non-default hard constraints */
     if (nd == 0) {
+#ifndef VRNA_DISABLE_C11_FEATURES
       vrna_smx_csr_free(mx_nd);
+#else
+      vrna_smx_csr_vrna_uchar_free(mx_nd);
+#endif
       mx_nd = NULL;
     }
   }
