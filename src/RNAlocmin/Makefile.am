@@ -21,7 +21,14 @@ EXTRA_DIST =  ${GENGETOPT_FILES} \
 # how we make the commandline interface parser
 ## See checkmk man page for details about *.ts files
 .ggo_cmdline.c:
-	$(AM_V_GEN)gengetopt -i $<
+	@if command -v gengetopt >/dev/null 2>&1; then \
+	  $(AM_V_GEN)gengetopt -i $<; \
+	elif test -f $@; then \
+	  :; \
+	else \
+	  echo "gengetopt not found and generated cmdline source '$@' is missing" >&2; \
+	  exit 1; \
+	fi
 
 _cmdline.c_cmdline.h :
 

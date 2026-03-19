@@ -1025,7 +1025,14 @@ uninstall-man: uninstall-man1
 globals.o: cmdline.h
 
 cmdline.h cmdline.c: kinfold.ggo
-	gengetopt -i kinfold.ggo
+	@if command -v gengetopt >/dev/null 2>&1; then \
+	  gengetopt -i kinfold.ggo; \
+	elif test -f cmdline.c && test -f cmdline.h; then \
+	  :; \
+	else \
+	  echo "gengetopt not found and generated cmdline sources are missing" >&2; \
+	  exit 1; \
+	fi
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
