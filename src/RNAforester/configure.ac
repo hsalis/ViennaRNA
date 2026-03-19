@@ -2,6 +2,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_REVISION($Revision: 1.13 $)
 AC_INIT([RNAforester],[2.0.1],[sschirme@techfak.uni-bielefeld.de],[RNAforester])
 AC_PREREQ([2.69])
+AC_CONFIG_AUX_DIR([../../config])
 
 AM_SILENT_RULES([yes])
 AM_INIT_AUTOMAKE([1.11])
@@ -82,7 +83,6 @@ dnl Checks for library functions.
 AC_CONFIG_SUBDIRS(g2-0.72)
 AC_CONFIG_FILES([Makefile src/Makefile man/Makefile])
 AC_OUTPUT
-
 
 
 

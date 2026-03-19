@@ -1,4 +1,5 @@
 AM_CPPFLAGS = $(VRNA_CFLAGS) -Wno-write-strings
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 AM_CXX_FLAGS = -fexceptions
 AM_CFLAGS =  -fexceptions
 

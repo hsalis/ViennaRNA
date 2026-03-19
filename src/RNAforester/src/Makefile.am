@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 AUTOMAKE_OPTIONS = subdir-objects
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 
 
 # C++ preprocesspr flags 

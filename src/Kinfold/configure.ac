@@ -5,6 +5,7 @@ AC_PREREQ([2.69])
 
 AC_INIT([kinfold],[1.4],[rna@tbi.univie.ac.at],[Kinfold])
 AC_CONFIG_SRCDIR([cache_util.h])
+AC_CONFIG_AUX_DIR([../../config])
 
 AM_SILENT_RULES([yes])
 dnl Every other copy of the package version number gets its value from here

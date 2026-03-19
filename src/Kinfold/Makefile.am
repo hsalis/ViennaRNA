@@ -1,5 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 AM_CPPFLAGS = -I$(top_srcdir)/src
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 
 if WITH_LIBRNA_API3
 AM_CFLAGS = @VRNA_CFLAGS@
