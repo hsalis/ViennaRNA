@@ -33022,6 +33022,8 @@ fi
 
 
 
+  PYTHON_INTERFACE=
+
   ## check for python requirements
   if test "x$with_python" != "xno"
 then :
@@ -41143,5 +41145,4 @@ Install Directories
       (scripts)               : $result__python2_lib_dir
 $ac_rna_warning
 $ac_rna_final_msg" >&6;}
-
 

@@ -62,7 +62,7 @@ EXTRA_DIST = \
 
 _RNA_la_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS)
 _RNA_la_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS) -Wno-unused-label -Wno-unused-variable
-_RNA_la_CPPFLAGS = -I$(PYTHON3_INC) $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src
+_RNA_la_CPPFLAGS = $(PYTHON3_INC) $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src
 
 _RNA_la_LIBADD = \
     $(LDADD) \
