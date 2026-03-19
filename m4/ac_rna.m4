@@ -58,6 +58,30 @@ RNA_ENABLE_STATIC_BIN
 RNA_ENABLE_SIMD
 RNA_ENABLE_VECTORIZE
 RNA_ENABLE_MPFR
+AC_MSG_NOTICE([Removing build artifacts that depend on configure results])
+rm -rf \
+  "$ac_pwd/src/ViennaRNA/.libs" \
+  "$ac_pwd/src/ViennaRNA"/*.a \
+  "$ac_pwd/src/ViennaRNA"/*.la \
+  "$ac_pwd/src/ViennaRNA"/*.lo \
+  "$ac_pwd/src/ViennaRNA"/*.o \
+  "$ac_pwd/src/ViennaRNA"/sampling/*.lo \
+  "$ac_pwd/src/ViennaRNA"/sampling/*.o \
+  "$ac_pwd/src/bin/.libs" \
+  "$ac_pwd/src/bin"/*.la \
+  "$ac_pwd/src/bin"/*.lo \
+  "$ac_pwd/src/bin"/*.o \
+  "$ac_pwd/src/bin"/RNAfold \
+  "$ac_pwd/src/bin"/RNAcofold \
+  "$ac_pwd/src/bin"/RNAsubopt \
+  "$ac_pwd/interfaces/Python/.libs" \
+  "$ac_pwd/interfaces/Python"/*.la \
+  "$ac_pwd/interfaces/Python"/*.lo \
+  "$ac_pwd/interfaces/Python"/*.o \
+  "$ac_pwd/interfaces/Python/RNA"/*.so \
+  "$ac_pwd/interfaces/Python/RNA"/*.bundle \
+  "$ac_pwd/interfaces/Python/RNA"/_RNA*.so \
+  "$ac_pwd/interfaces/Python/RNA"/_RNA*.bundle
 RNA_ENABLE_NAVIEW
 RNA_ENABLE_DEBUG_RNALIB
 
@@ -313,6 +337,7 @@ Optimizations
 -------------
   * Auto Vectorization        : ${result_vectorize}
   * Explicit SIMD Extension   : ${result_simd} ${simd_failed}
+  * SIMD ISA Slices           : ${simd_enabled_slices}
   * Link Time Optimization    : ${result_lto}
   * POSIX Threads             : ${result_pthreads}
   * OpenMP                    : ${result_openmp}
@@ -365,6 +390,3 @@ Install Directories
 $ac_rna_warning
 $ac_rna_final_msg])
 ])
-
-
-

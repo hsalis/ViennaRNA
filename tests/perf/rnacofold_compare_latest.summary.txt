@@ -1,0 +1,19 @@
+seed: 1729
+total_dimers: 30
+total_differences: 0
+
+workload_runtime:
+  new_median_ns=867926250 old_median_ns=1128766666 ratio=0.7689
+
+per_length_pair:
+  50x50: count=4 diff_count=0 median_new_ns=6477666 median_old_ns=6942271 median_ratio=0.9332 max_abs_energy_delta=0.000000
+  50x100: count=4 diff_count=0 median_new_ns=11494812 median_old_ns=15718854 median_ratio=0.7489 max_abs_energy_delta=0.000000
+  50x200: count=4 diff_count=0 median_new_ns=29640750 median_old_ns=48224083 median_ratio=0.6112 max_abs_energy_delta=0.000000
+  100x50: count=3 diff_count=0 median_new_ns=12122416 median_old_ns=12762166 median_ratio=0.9432 max_abs_energy_delta=0.000000
+  100x100: count=3 diff_count=0 median_new_ns=19897750 median_old_ns=23818250 median_ratio=0.8306 max_abs_energy_delta=0.000000
+  100x200: count=3 diff_count=0 median_new_ns=43465334 median_old_ns=64727958 median_ratio=0.6907 max_abs_energy_delta=0.000000
+  200x50: count=3 diff_count=0 median_new_ns=30916916 median_old_ns=32516084 median_ratio=0.9464 max_abs_energy_delta=0.000000
+  200x100: count=3 diff_count=0 median_new_ns=40890333 median_old_ns=46732500 median_ratio=0.8750 max_abs_energy_delta=0.000000
+  200x200: count=3 diff_count=0 median_new_ns=76551208 median_old_ns=99634750 median_ratio=0.7684 max_abs_energy_delta=0.000000
+
+differences: none

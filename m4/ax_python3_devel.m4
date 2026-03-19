@@ -6,6 +6,7 @@ AC_DEFUN([AX_PYTHON3_DEVEL],[
       AC_PATH_PROGS([PYTHON3], [python3 python312 python3.12 python311 python3.11 python310 python3.10 python39 python3.9 python38 python3.8 python37 python3.7 python36 python3.6 python35 python3.5 python34 python3.4], [no])
     fi
     AC_ARG_VAR(PYTHON3, [Path to Python3 interpreter (e.g.: /usr/bin/python3)])
+    AC_SUBST(PYTHON3)
 
     if test "${PYTHON3}" != "no" ; then
       if $PYTHON3 -c 'import sysconfig' 2> /dev/null

@@ -26,6 +26,8 @@
 #include "ViennaRNA/utils/basic.h"
 #include "ViennaRNA/utils/log.h"
 #include "ViennaRNA/mfe/gquad.h"
+#include "ViennaRNA/intern/mfe_scratch.h"
+#include "ViennaRNA/intern/pf_scratch.h"
 #include "ViennaRNA/datastructures/dp_matrices.h"
 
 /*
@@ -173,6 +175,22 @@ PRIVATE INLINE void
 nullify_pf(vrna_mx_pf_t *mx);
 
 
+PRIVATE vrna_mfe_scratch_t *
+init_mfe_scratch(vrna_fold_compound_t *fc);
+
+
+PRIVATE void
+free_mfe_scratch(vrna_mfe_scratch_t *scratch);
+
+
+PRIVATE vrna_pf_scratch_t *
+init_pf_scratch(vrna_fold_compound_t *fc);
+
+
+PRIVATE void
+free_pf_scratch(vrna_pf_scratch_t *scratch);
+
+
 /*
  #################################
  # BEGIN OF FUNCTION DEFINITIONS #
@@ -239,6 +257,7 @@ vrna_mx_pf_free(vrna_fold_compound_t *vc)
 
       free(self->expMLbase);
       free(self->scale);
+      free_pf_scratch((vrna_pf_scratch_t *)self->aux_pf);
 
       free(self);
       vc->exp_matrices = NULL;
@@ -590,6 +609,7 @@ get_mx_alloc_vector(vrna_fold_compound_t  *fc,
 PRIVATE void
 mfe_matrices_free_default(vrna_mx_mfe_t *self)
 {
+  free_mfe_scratch((vrna_mfe_scratch_t *)self->aux_mfe);
   free(self->f5);
   free(self->f3);
 
@@ -1328,6 +1348,8 @@ init_mx_mfe_default(vrna_fold_compound_t  *fc,
 
     if (alloc_vector & ALLOC_CIRC)
       mx->fM1_new  = (int *)vrna_alloc(sizeof(int) * lin_size);
+
+    mx->aux_mfe = init_mfe_scratch(fc);
   }
 
   return mx;
@@ -1492,6 +1514,7 @@ nullify_mfe(vrna_mx_mfe_t *mx)
   if (mx) {
     mx->length  = 0;
     mx->strands = 0;
+    mx->aux_mfe = NULL;
 
     switch (mx->type) {
       case VRNA_MX_DEFAULT:
@@ -1603,6 +1626,108 @@ nullify_mfe(vrna_mx_mfe_t *mx)
 }
 
 
+PRIVATE vrna_mfe_scratch_t *
+init_mfe_scratch(vrna_fold_compound_t *fc)
+{
+  unsigned int        n;
+  vrna_mfe_scratch_t  *scratch;
+
+  if ((!fc) ||
+      (fc->hc && (fc->hc->type == VRNA_HC_WINDOW)))
+    return NULL;
+
+  n       = fc->length;
+  scratch = vrna_alloc(sizeof(vrna_mfe_scratch_t));
+
+  scratch->cc             = (int *)vrna_alloc(sizeof(int) * (n + 2));
+  scratch->cc1            = (int *)vrna_alloc(sizeof(int) * (n + 2));
+  scratch->ml_helpers     = vrna_mfe_multibranch_fast_init(n);
+  scratch->ext_stems      = (int *)vrna_alloc(sizeof(int) * (n + 1));
+  scratch->ext_stems_size = n + 1;
+
+  if (fc->type == VRNA_FC_TYPE_COMPARATIVE) {
+    scratch->ext_tmp1         = (short *)vrna_alloc(sizeof(short) * fc->n_seq);
+    scratch->ext_tmp2         = (short *)vrna_alloc(sizeof(short) * fc->n_seq);
+    scratch->ext_tmp_size     = fc->n_seq;
+    scratch->int_tt           = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
+    scratch->int_tt_size      = fc->n_seq;
+    scratch->int_ext_tt       = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
+    scratch->int_ext_tt_size  = fc->n_seq;
+  }
+
+  scratch->bt_stack = vrna_bts_init(500);
+  scratch->bp_stack = vrna_bps_init(4 * (1 + n / 2));
+
+  return scratch;
+}
+
+
+PRIVATE void
+free_mfe_scratch(vrna_mfe_scratch_t *scratch)
+{
+  if (!scratch)
+    return;
+
+  free(scratch->cc);
+  free(scratch->cc1);
+  vrna_mfe_multibranch_fast_free(scratch->ml_helpers);
+  free(scratch->ext_stems);
+  free(scratch->ext_tmp1);
+  free(scratch->ext_tmp2);
+  free(scratch->int_tt);
+  free(scratch->int_ext_tt);
+  vrna_bts_free(scratch->bt_stack);
+  vrna_bps_free(scratch->bp_stack);
+  free(scratch);
+}
+
+
+PRIVATE vrna_pf_scratch_t *
+init_pf_scratch(vrna_fold_compound_t *fc)
+{
+  vrna_pf_scratch_t *scratch;
+  unsigned int      n;
+
+  if ((!fc) ||
+      (fc->hc && (fc->hc->type == VRNA_HC_WINDOW)))
+    return NULL;
+
+  scratch = (vrna_pf_scratch_t *)vrna_alloc(sizeof(*scratch));
+  n       = fc->length;
+
+  scratch->ext_helpers = NULL;
+  scratch->ml_helpers  = NULL;
+  scratch->qm1_tmp     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+  scratch->int_tt      = (fc->type == VRNA_FC_TYPE_COMPARATIVE) ?
+                         (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq) :
+                         NULL;
+  scratch->ext_int_tt  = (fc->type == VRNA_FC_TYPE_COMPARATIVE) ?
+                         (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq) :
+                         NULL;
+
+  return scratch;
+}
+
+
+PRIVATE void
+free_pf_scratch(vrna_pf_scratch_t *scratch)
+{
+  if (!scratch)
+    return;
+
+  if (scratch->ext_helpers)
+    vrna_exp_E_ext_fast_free(scratch->ext_helpers);
+
+  if (scratch->ml_helpers)
+    vrna_exp_E_ml_fast_free(scratch->ml_helpers);
+
+  free(scratch->qm1_tmp);
+  free(scratch->int_tt);
+  free(scratch->ext_int_tt);
+  free(scratch);
+}
+
+
 PRIVATE vrna_mx_pf_t *
 init_mx_pf_default(vrna_fold_compound_t *fc,
                    unsigned int         alloc_vector)
@@ -1666,6 +1791,7 @@ init_mx_pf_default(vrna_fold_compound_t *fc,
      */
     mx->scale     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
     mx->expMLbase = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
+    mx->aux_pf    = init_pf_scratch(fc);
   }
 
   return mx;
@@ -1725,6 +1851,7 @@ init_mx_pf_window(vrna_fold_compound_t  *fc,
      */
     mx->scale     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
     mx->expMLbase = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
+    mx->aux_pf    = init_pf_scratch(fc);
   }
 
   return mx;
@@ -1811,6 +1938,7 @@ init_mx_pf_2Dfold(vrna_fold_compound_t  *fc,
      */
     mx->scale     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
     mx->expMLbase = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * lin_size);
+    mx->aux_pf    = init_pf_scratch(fc);
   }
 
   return mx;
@@ -1822,6 +1950,7 @@ nullify_pf(vrna_mx_pf_t *mx)
 {
   if (mx) {
     mx->length    = 0;
+    mx->aux_pf    = NULL;
     mx->scale     = NULL;
     mx->expMLbase = NULL;
 

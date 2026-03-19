@@ -115,6 +115,23 @@ PRIVATE char              *ptype = NULL;  /* precomputed array of pair types */
 PRIVATE int               init_length;    /* length in last call to init_pf_fold()*/
 PRIVATE double            init_temp;      /* temperature in last call to scale_pf_params */
 PRIVATE int               *my_iindx = NULL;
+PRIVATE char              *pfi_seq = NULL, *pfi_long = NULL, *pfi_short = NULL;
+PRIVATE size_t            pfi_seq_cap = 0, pfi_long_cap = 0, pfi_short_cap = 0;
+PRIVATE FLT_OR_DBL        **pfi_qint_ik = NULL, **pfi_int_ik = NULL;
+PRIVATE FLT_OR_DBL        *pfi_qint_ik_storage = NULL, *pfi_int_ik_storage = NULL;
+PRIVATE size_t            pfi_ik_rows_cap = 0, pfi_ik_cells_cap = 0;
+PRIVATE FLT_OR_DBL        ****pfi_qint4_index = NULL, ****pfi_qint4_slots = NULL;
+PRIVATE FLT_OR_DBL        ***pfi_qint4_slot_j = NULL;
+PRIVATE FLT_OR_DBL        **pfi_qint4_slot_k = NULL;
+PRIVATE FLT_OR_DBL        *pfi_qint4_storage = NULL;
+PRIVATE size_t            pfi_qint4_index_cap = 0, pfi_qint4_ring_cap = 0, pfi_qint4_n2_cap = 0;
+PRIVATE size_t            pfi_qint4_w_cap = 0, pfi_qint4_kptr_cap = 0, pfi_qint4_cell_cap = 0;
+PRIVATE double            *pfu_sum_M = NULL, *pfu_store_H = NULL, *pfu_store_Io = NULL;
+PRIVATE double            *pfu_store_M_qm_o = NULL, *pfu_store_M_mlbase = NULL;
+PRIVATE double            **pfu_store_I2o = NULL, *pfu_store_I2o_storage = NULL;
+PRIVATE size_t            pfu_sum_M_cap = 0, pfu_store_H_cap = 0, pfu_store_Io_cap = 0;
+PRIVATE size_t            pfu_store_M_qm_o_cap = 0, pfu_store_M_mlbase_cap = 0;
+PRIVATE size_t            pfu_store_I2o_rows_cap = 0, pfu_store_I2o_cells_cap = 0;
 /* make iptypes array for intermolecular constrains (ipidx for indexing)*/
 
 
@@ -186,6 +203,22 @@ get_interact_arrays(unsigned int  n1,
                     double        ***p_c2_S);
 
 
+PRIVATE void
+ensure_pf_interact_scratch(unsigned int n1,
+                           unsigned int n2);
+
+
+PRIVATE void
+ensure_pf_interact_qint4_scratch(unsigned int n1,
+                                 unsigned int n2,
+                                 int          w);
+
+
+PRIVATE void
+ensure_pf_unstru_scratch(unsigned int n,
+                         size_t       size);
+
+
 /*
  #################################
  # BEGIN OF FUNCTION DEFINITIONS #
@@ -196,6 +229,7 @@ get_pu_contrib_struct(unsigned int  n,
                       unsigned int  w)
 {
   unsigned int  i;
+  double        *slab_h, *slab_i, *slab_m, *slab_e;
   pu_contrib    *pu = (pu_contrib *)vrna_alloc(sizeof(pu_contrib));
 
   pu->length  = n;
@@ -210,14 +244,245 @@ get_pu_contrib_struct(unsigned int  n,
   pu->I = (double **)vrna_alloc(sizeof(double *) * (n + 1));
   pu->M = (double **)vrna_alloc(sizeof(double *) * (n + 1));
   pu->E = (double **)vrna_alloc(sizeof(double *) * (n + 1));
+  slab_h = (double *)vrna_alloc(sizeof(double) * (n + 1) * (w + 1));
+  slab_i = (double *)vrna_alloc(sizeof(double) * (n + 1) * (w + 1));
+  slab_m = (double *)vrna_alloc(sizeof(double) * (n + 1) * (w + 1));
+  slab_e = (double *)vrna_alloc(sizeof(double) * (n + 1) * (w + 1));
   for (i = 0; i <= n; i++) {
-    pu->H[i]  = (double *)vrna_alloc(sizeof(double) * (w + 1));
-    pu->I[i]  = (double *)vrna_alloc(sizeof(double) * (w + 1));
-    pu->M[i]  = (double *)vrna_alloc(sizeof(double) * (w + 1));
-    pu->E[i]  = (double *)vrna_alloc(sizeof(double) * (w + 1));
+    pu->H[i] = slab_h + i * (w + 1);
+    pu->I[i] = slab_i + i * (w + 1);
+    pu->M[i] = slab_m + i * (w + 1);
+    pu->E[i] = slab_e + i * (w + 1);
   }
   return pu;
 }
+
+
+PRIVATE void
+ensure_pf_interact_scratch(unsigned int n1,
+                           unsigned int n2)
+{
+  size_t i;
+  size_t need_rows;
+  size_t need_cells;
+  size_t need_seq;
+  size_t need_long;
+  size_t need_short;
+
+  need_rows  = (size_t)n1 + 1;
+  need_cells = need_rows * need_rows;
+  need_seq   = (size_t)n1 + (size_t)n2 + 2;
+  need_long  = (size_t)n1 + 1;
+  need_short = (size_t)n2 + 1;
+
+  if (pfi_seq_cap < need_seq) {
+    pfi_seq     = (char *)vrna_realloc(pfi_seq, sizeof(char) * need_seq);
+    pfi_seq_cap = need_seq;
+  }
+
+  if (pfi_long_cap < need_long) {
+    pfi_long     = (char *)vrna_realloc(pfi_long, sizeof(char) * need_long);
+    pfi_long_cap = need_long;
+  }
+
+  if (pfi_short_cap < need_short) {
+    pfi_short     = (char *)vrna_realloc(pfi_short, sizeof(char) * need_short);
+    pfi_short_cap = need_short;
+  }
+
+  if (pfi_ik_rows_cap < need_rows) {
+    pfi_qint_ik     = (FLT_OR_DBL **)vrna_realloc(pfi_qint_ik, sizeof(FLT_OR_DBL *) * need_rows);
+    pfi_int_ik      = (FLT_OR_DBL **)vrna_realloc(pfi_int_ik, sizeof(FLT_OR_DBL *) * need_rows);
+    pfi_ik_rows_cap = need_rows;
+  }
+
+  if (pfi_ik_cells_cap < need_cells) {
+    pfi_qint_ik_storage = (FLT_OR_DBL *)vrna_realloc(pfi_qint_ik_storage,
+                                                     sizeof(FLT_OR_DBL) * need_cells);
+    pfi_int_ik_storage  = (FLT_OR_DBL *)vrna_realloc(pfi_int_ik_storage,
+                                                     sizeof(FLT_OR_DBL) * need_cells);
+    pfi_ik_cells_cap    = need_cells;
+  }
+
+  memset(pfi_qint_ik_storage, 0, sizeof(FLT_OR_DBL) * need_cells);
+  memset(pfi_int_ik_storage, 0, sizeof(FLT_OR_DBL) * need_cells);
+
+  for (i = 0; i < need_rows; i++) {
+    pfi_qint_ik[i] = pfi_qint_ik_storage + (i * need_rows);
+    pfi_int_ik[i]  = pfi_int_ik_storage + (i * need_rows);
+  }
+}
+
+
+PRIVATE void
+ensure_pf_unstru_scratch(unsigned int n,
+                         size_t       size)
+{
+  size_t i;
+  size_t need_sum_M;
+  size_t need_store_H;
+  size_t need_store_Io;
+  size_t need_store_M_qm_o;
+  size_t need_store_M_mlbase;
+  size_t need_rows;
+  size_t need_cells;
+
+  need_sum_M         = (size_t)n + 1;
+  need_store_H       = (size_t)n + 2;
+  need_store_Io      = (size_t)n + 2;
+  need_store_M_qm_o  = (size_t)n + 1;
+  need_store_M_mlbase = size + 1;
+  need_rows          = (size_t)n + 1;
+  need_cells         = need_rows * (MAXLOOP + 2);
+
+  if (pfu_sum_M_cap < need_sum_M) {
+    pfu_sum_M     = (double *)vrna_realloc(pfu_sum_M, sizeof(double) * need_sum_M);
+    pfu_sum_M_cap = need_sum_M;
+  }
+
+  if (pfu_store_H_cap < need_store_H) {
+    pfu_store_H     = (double *)vrna_realloc(pfu_store_H, sizeof(double) * need_store_H);
+    pfu_store_H_cap = need_store_H;
+  }
+
+  if (pfu_store_Io_cap < need_store_Io) {
+    pfu_store_Io     = (double *)vrna_realloc(pfu_store_Io, sizeof(double) * need_store_Io);
+    pfu_store_Io_cap = need_store_Io;
+  }
+
+  if (pfu_store_M_qm_o_cap < need_store_M_qm_o) {
+    pfu_store_M_qm_o     = (double *)vrna_realloc(pfu_store_M_qm_o, sizeof(double) * need_store_M_qm_o);
+    pfu_store_M_qm_o_cap = need_store_M_qm_o;
+  }
+
+  if (pfu_store_M_mlbase_cap < need_store_M_mlbase) {
+    pfu_store_M_mlbase     = (double *)vrna_realloc(pfu_store_M_mlbase,
+                                                    sizeof(double) * need_store_M_mlbase);
+    pfu_store_M_mlbase_cap = need_store_M_mlbase;
+  }
+
+  if (pfu_store_I2o_rows_cap < need_rows) {
+    pfu_store_I2o          = (double **)vrna_realloc(pfu_store_I2o, sizeof(double *) * need_rows);
+    pfu_store_I2o_rows_cap = need_rows;
+  }
+
+  if (pfu_store_I2o_cells_cap < need_cells) {
+    pfu_store_I2o_storage     = (double *)vrna_realloc(pfu_store_I2o_storage,
+                                                       sizeof(double) * need_cells);
+    pfu_store_I2o_cells_cap   = need_cells;
+  }
+
+  memset(pfu_sum_M, 0, sizeof(double) * need_sum_M);
+  memset(pfu_store_H, 0, sizeof(double) * need_store_H);
+  memset(pfu_store_Io, 0, sizeof(double) * need_store_Io);
+  memset(pfu_store_M_qm_o, 0, sizeof(double) * need_store_M_qm_o);
+  memset(pfu_store_M_mlbase, 0, sizeof(double) * need_store_M_mlbase);
+  memset(pfu_store_I2o_storage, 0, sizeof(double) * need_cells);
+
+  for (i = 0; i < need_rows; i++)
+    pfu_store_I2o[i] = pfu_store_I2o_storage + i * (MAXLOOP + 2);
+}
+
+
+PRIVATE void
+ensure_pf_interact_qint4_scratch(unsigned int n1,
+                                 unsigned int n2,
+                                 int          w)
+{
+  size_t i, j, k;
+  int    grew_index, grew_ring, grew_n2, grew_w, grew_cells;
+  size_t need_index;
+  size_t need_ring;
+  size_t need_n2;
+  size_t need_w;
+  size_t need_slot_j;
+  size_t need_slot_k;
+  size_t need_cells;
+  size_t row_stride;
+  size_t cell_stride;
+
+  need_index = (size_t)n1 + 1;
+  need_ring  = (size_t)w + 1;
+  need_n2    = (size_t)n2 + 1;
+  need_w     = (size_t)w + 1;
+  need_slot_j = need_ring * need_n2;
+  need_slot_k = need_slot_j * need_w;
+  need_cells  = need_slot_k * need_w;
+  grew_index  = 0;
+  grew_ring   = 0;
+  grew_n2     = 0;
+  grew_w      = 0;
+  grew_cells  = 0;
+
+  if (pfi_qint4_index_cap < need_index) {
+    pfi_qint4_index     = (FLT_OR_DBL ****)vrna_realloc(pfi_qint4_index,
+                                                        sizeof(FLT_OR_DBL ***) * need_index);
+    pfi_qint4_index_cap = need_index;
+    grew_index          = 1;
+  }
+
+  if (pfi_qint4_ring_cap < need_ring) {
+    pfi_qint4_slots     = (FLT_OR_DBL ****)vrna_realloc(pfi_qint4_slots,
+                                                        sizeof(FLT_OR_DBL ***) * need_ring);
+    pfi_qint4_ring_cap  = need_ring;
+    grew_ring           = 1;
+  }
+
+  if (pfi_qint4_n2_cap < need_n2) {
+    pfi_qint4_n2_cap = need_n2;
+    grew_n2          = 1;
+  }
+
+  if (grew_ring || grew_n2) {
+    pfi_qint4_slot_j = (FLT_OR_DBL ***)vrna_realloc(pfi_qint4_slot_j,
+                                                    sizeof(FLT_OR_DBL **) * need_slot_j);
+  }
+
+  if (pfi_qint4_w_cap < need_w) {
+    pfi_qint4_w_cap = need_w;
+    grew_w          = 1;
+  }
+
+  if (grew_ring || grew_n2 || grew_w) {
+    pfi_qint4_slot_k = (FLT_OR_DBL **)vrna_realloc(pfi_qint4_slot_k,
+                                                   sizeof(FLT_OR_DBL *) * need_slot_k);
+    pfi_qint4_kptr_cap = need_slot_k;
+  }
+
+  if (pfi_qint4_cell_cap < need_cells) {
+    pfi_qint4_cell_cap = need_cells;
+    grew_cells         = 1;
+  }
+
+  if (grew_ring || grew_n2 || grew_w || grew_cells) {
+    pfi_qint4_storage = (FLT_OR_DBL *)vrna_realloc(pfi_qint4_storage,
+                                                   sizeof(FLT_OR_DBL) * need_cells);
+  }
+
+  memset(pfi_qint4_index, 0, sizeof(FLT_OR_DBL ***) * need_index);
+  memset(pfi_qint4_storage, 0, sizeof(FLT_OR_DBL) * need_cells);
+
+  row_stride  = need_n2 * need_w;
+  cell_stride = need_w * need_w;
+
+  for (i = 0; i < need_ring; i++) {
+    pfi_qint4_slots[i] = pfi_qint4_slot_j + i * need_n2;
+
+    for (j = 0; j < need_n2; j++) {
+      size_t base = i * row_stride + j * need_w;
+
+      pfi_qint4_slots[i][j] = pfi_qint4_slot_k + base;
+
+      for (k = 0; k < need_w; k++) {
+        size_t offset = (i * need_n2 * cell_stride) + (j * cell_stride) + (k * need_w);
+
+        pfi_qint4_slots[i][j][k] = pfi_qint4_storage + offset;
+      }
+    }
+  }
+}
+
+
 
 
 PUBLIC void
@@ -233,12 +498,11 @@ free_pu_contrib_struct(pu_contrib *pu)
   unsigned int i;
 
   if (pu != NULL) {
-    for (i = 0; i <= pu->length; i++) {
-      free(pu->H[i]);
-      free(pu->I[i]);
-      free(pu->M[i]);
-      free(pu->E[i]);
-    }
+    i = 0;
+    free(pu->H[i]);
+    free(pu->I[i]);
+    free(pu->M[i]);
+    free(pu->E[i]);
     free(pu->H);
     free(pu->I);
     free(pu->M);
@@ -270,6 +534,13 @@ pf_unstru(char  *sequence,
 
   get_up_arrays((unsigned)n);
   init_pf_two(n);
+  ensure_pf_unstru_scratch((unsigned int)n, (size_t)size);
+  sum_M           = pfu_sum_M;
+  store_H         = pfu_store_H;
+  store_Io        = pfu_store_Io;
+  store_I2o       = pfu_store_I2o;
+  store_M_qm_o    = pfu_store_M_qm_o;
+  store_M_mlbase  = pfu_store_M_mlbase;
 
   /* init everything */
   for (d = 0; d <= TURN; d++)
@@ -296,23 +567,13 @@ pf_unstru(char  *sequence,
     }
   }
 
-  /* alloc even more memory */
-  store_I2o = (double **)vrna_alloc(sizeof(double *) * (n + 1)); /* for p,k */
-  for (i = 0; i <= n; i++)
-    store_I2o[i] = (double *)vrna_alloc(sizeof(double) * (MAXLOOP + 2));
-
-  /* expMLbase[i-p]*dangles_po */
-  store_M_mlbase = (double *)vrna_alloc(sizeof(double) * (size + 1));
-
   /* 2. exterior bp (p,o) encloses unpaired region [i,i+w[*/
   for (o = TURN + 2; o <= n; o++) {
     double sum_h;
-    /*allocate space for arrays to store different contributions to H, I & M */
-    store_H = (double *)vrna_alloc(sizeof(double) * (o + 2));
-    /* unpaired between ]l,o[ */
-    store_Io = (double *)vrna_alloc(sizeof(double) * (o + 2));
-    /* qm[p+1,i-1]*dangles_po */
-    store_M_qm_o = (double *)vrna_alloc(sizeof(double) * (n + 1));
+    /* reset arrays that are reused for each enclosing pair endpoint o */
+    memset(store_H, 0, sizeof(double) * (o + 2));
+    memset(store_Io, 0, sizeof(double) * (o + 2));
+    memset(store_M_qm_o, 0, sizeof(double) * (n + 1));
 
     for (p = o - TURN - 1; p >= 1; p--) {
       /* construction of partition function of segment [p,o], given that
@@ -441,9 +702,6 @@ pf_unstru(char  *sequence,
     qqm2    = qq_1m2;
     qq_1m2  = tmp;
 
-    free(store_Io);
-    free(store_H);
-    free(store_M_qm_o);
   }/* end for (o=..) */
 
   for (i = 1; i < n; i++) {
@@ -469,10 +727,6 @@ pf_unstru(char  *sequence,
       }
     }
   }
-
-  for (i = 0; i <= n; i++)
-    free(store_I2o[i]);
-  free(store_I2o);
 
   for (i = 1; i <= n; i++)
     /* set auxillary arrays to 0 */
@@ -550,8 +804,6 @@ pf_unstru(char  *sequence,
     }
   }
 
-  free(sum_M);
-  free(store_M_mlbase);
   free_up_arrays();
   return pu_test;
 }
@@ -569,23 +821,30 @@ get_interact_arrays(unsigned int  n1,
                     double        ***p_c2_S)
 {
   unsigned int  i;
-  int           pc_size, j;
+  int           pc_size1, pc_size2, j;
+  double        *slab;
 
+  *p_c2_S = NULL;
   *p_c_S = (double **)vrna_alloc(sizeof(double *) * (n1 + 1));
+  pc_size1 = MIN2((w + incr5 + incr3), (int)n1);
+  slab = (double *)vrna_alloc(sizeof(double) * (n1 + 1) * (pc_size1 + 1));
+  for (i = 0; i <= n1; i++)
+    (*p_c_S)[i] = slab + i * (pc_size1 + 1);
 
   for (i = 1; i <= n1; i++) {
-    pc_size     = MIN2((w + incr5 + incr3), (int)n1);
-    (*p_c_S)[i] = (double *)vrna_alloc(sizeof(double) * (pc_size + 1));
-    for (j = 0; j < pc_size; j++)
+    for (j = 0; j < pc_size1; j++)
       (*p_c_S)[i][j] = p_c->H[i][j] + p_c->I[i][j] + p_c->M[i][j] + p_c->E[i][j];
   }
 
   if (p_c2 != NULL) {
     (*p_c2_S) = (double **)vrna_alloc(sizeof(double *) * (n2 + 1));
+    pc_size2 = MIN2(w, (int)n2);
+    slab = (double *)vrna_alloc(sizeof(double) * (n2 + 1) * (pc_size2 + 2));
+    for (i = 0; i <= n2; i++)
+      (*p_c2_S)[i] = slab + i * (pc_size2 + 2);
+
     for (i = 1; i <= n2; i++) {
-      pc_size       = MIN2(w, (int)n2);
-      (*p_c2_S)[i]  = (double *)vrna_alloc(sizeof(double) * (pc_size + 2));
-      for (j = 0; j < pc_size; j++)
+      for (j = 0; j < pc_size2; j++)
         (*p_c2_S)[i][j] = p_c2->H[i][j] + p_c2->I[i][j] + p_c2->M[i][j] + p_c2->E[i][j];
     }
   }
@@ -621,15 +880,20 @@ pf_interact(const char  *s1,
 
   G_min = G_is = Gi_min = 100.0;
   gi    = gj = gk = gl = ci = cj = ck = cl = 0;
+  p_c_S = NULL;
+  p_c2_S = NULL;
 
   n1      = (int)strlen(s1);
   n2      = (int)strlen(s2);
   prev_k  = 1;
   prev_l  = n2;
 
-  i_long  = (char *)vrna_alloc(sizeof(char) * (n1 + 1));
-  i_short = (char *)vrna_alloc(sizeof(char) * (n2 + 1));
-  Seq     = (char *)vrna_alloc(sizeof(char) * (n1 + n2 + 2));
+  ensure_pf_interact_scratch((unsigned int)n1, (unsigned int)n2);
+  ensure_pf_interact_qint4_scratch((unsigned int)n1, (unsigned int)n2, w);
+  i_long  = pfi_long;
+  i_short = pfi_short;
+  Seq     = pfi_seq;
+  qint_4  = pfi_qint4_index;
 
   strcpy(Seq, s1);
   strcat(Seq, s2);
@@ -658,13 +922,8 @@ pf_interact(const char  *s1,
   /* we also pass twice the seq-length to avoid bogus access to scale[] array */
   scale_stru_pf_params((unsigned)2 * n1);
 
-  qint_ik = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (n1 + 1));
-  for (i = 1; i <= n1; i++)
-    qint_ik[i] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n1 + 1));
-  /* int_ik */
-  int_ik = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (n1 + 1));
-  for (i = 1; i <= n1; i++)
-    int_ik[i] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n1 + 1));
+  qint_ik = pfi_qint_ik;
+  int_ik  = pfi_int_ik;
   Z_int = 0.;
   /*  Gint = ( -log(int_ik[gk][gi])-( ((int) w/2)*log(pf_scale)) )*((Pf->temperature+K0)*GASCONST/1000.0); */
   const_scale = ((int)w / 2) * log(pf_scale);
@@ -745,9 +1004,6 @@ pf_interact(const char  *s1,
   /*  qint_4[i][j][k][l] contribution that region (k-i) in seq1 (l=n1)
    *  is paired to region (l-j) in seq 2(l=n2) that is
    *  a region closed by bp k-l  and bp i-j */
-  qint_4 = (FLT_OR_DBL ****)vrna_alloc(sizeof(FLT_OR_DBL ***) * (n1 + 1));
-
-  /* qint_4[i][j][k][l] */
   for (i = 1; i <= n1; i++) {
     int end_k;
     end_k = i - w;
@@ -763,13 +1019,7 @@ pf_interact(const char  *s1,
     if (fold_constrained && pos && ck && i > ck + w - 1)
       break;
 
-    /* note: qint_4[i] will be freed before we allocate qint_4[i+1] */
-    qint_4[i] = (FLT_OR_DBL ***)vrna_alloc(sizeof(FLT_OR_DBL **) * (n2 + 1));
-    for (j = n2; j > 0; j--) {
-      qint_4[i][j] = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (w + 1));
-      for (k = 0; k <= w; k++)
-        qint_4[i][j][k] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (w + 1));
-    }
+    qint_4[i] = pfi_qint4_slots[i % (w + 1)];
 
     prev_k = 1;
     for (j = n2; j > 0; j--) {
@@ -974,13 +1224,6 @@ pf_interact(const char  *s1,
 
       if (fold_constrained && pos && ci)
         bla = MAX2(ci - w + 1, i - w);
-
-      for (j = n2; j > 0; j--) {
-        for (k = 0; k <= w; k++)
-          free(qint_4[bla][j][k]);
-        free(qint_4[bla][j]);
-      }
-      free(qint_4[bla]);
       qint_4[bla] = NULL;
     }
   }
@@ -1001,50 +1244,6 @@ pf_interact(const char  *s1,
       }
     }
   }
-  if (n1 > w) {
-    int start_i, end_i;
-    start_i = n1 - w + 1;
-    end_i   = n1;
-    if (fold_constrained && pos && ci) {
-      /* a break in the k loop might result in unfreed values */
-      start_i = ci - w + 1 < n1 - w + 1 ? ci - w + 1 : n1 - w + 1;
-      start_i = start_i > 0 ? start_i : 1;
-      /* start_i = ck; */
-      end_i = ck + w - 1 > n1 ? n1 : ck + w - 1;
-    }
-
-    for (i = start_i; i <= end_i; i++) {
-      if (qint_4[i] == NULL)
-        continue;
-
-      for (j = n2; j > 0; j--) {
-        for (k = 0; k <= w; k++)
-          free(qint_4[i][j][k]);
-        free(qint_4[i][j]);
-      }
-      free(qint_4[i]);
-    }
-    free(qint_4);
-  } else {
-    int start_i, end_i;
-    start_i = 1;
-    end_i   = n1;
-    if (fold_constrained && pos) {
-      start_i = ci - w + 1 > 0 ? ci - w + 1 : 1;
-      end_i   = ck + w - 1 > n1 ? n1 : ck + w - 1;
-    }
-
-    for (i = start_i; i <= end_i; i++) {
-      for (j = n2; j > 0; j--) {
-        for (k = 0; k <= w; k++)
-          free(qint_4[i][j][k]);
-        free(qint_4[i][j]);
-      }
-      free(qint_4[i]);
-    }
-    free(qint_4);
-  }
-
   if (fold_constrained && (gi == 0 || gk == 0 || gl == 0 || gj == 0)) {
     vrna_log_error("pf_interact: could not satisfy all constraints");
 
@@ -1066,19 +1265,6 @@ pf_interact(const char  *s1,
 
   early_exit:
 
-  free(i_long);
-  free(i_short);
-
-  if (int_ik)
-    for (i = 1; i <= n1; i++)
-      free(int_ik[i]);
-  free(int_ik);
-
-  if (qint_ik)
-    for (i = 1; i <= n1; i++)
-      free(qint_ik[i]);
-  free(qint_ik);
-
   /* reset the global variables pf_scale and scale to their original values */
   pf_scale = temppfs;                 /* reset pf_scale */
   scale_stru_pf_params((unsigned)n1); /* reset the scale array */
@@ -1094,16 +1280,15 @@ pf_interact(const char  *s1,
     scale = NULL;
   }
 
-  for (i = 1; i <= n1; i++)
-    free(p_c_S[i]);
-  free(p_c_S);
-  if (p_c2 != NULL) {
-    for (i = 1; i <= n2; i++)
-      free(p_c2_S[i]);
+  if (p_c_S) {
+    free(p_c_S[0]);
+    free(p_c_S);
+  }
+  if (p_c2_S) {
+    free(p_c2_S[0]);
     free(p_c2_S);
   }
 
-  free(Seq);
   free(cc->indx);
   free(cc->ptype);
   free(cc);

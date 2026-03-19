@@ -145,14 +145,14 @@ AC_DEFUN([RNA_ENABLE_MPFR], [
   RNA_FEATURE_IF_ENABLED([mpfr],[
     ## Check for mpfr.h header first
     AC_CHECK_HEADER([mpfr.h], [
-      ## now, check if we can compile a program
-      AC_MSG_CHECKING([whether we can compile programs with mpfr support])
+      ## now, check if we can link a program
+      AC_MSG_CHECKING([whether we can link programs with mpfr support])
       ac_save_LIBS="$LIBS"
       LIBS="$ac_save_LIBS -lmpfr -lgmp"
 
       AC_LANG_PUSH([C])
 
-      AC_COMPILE_IFELSE([
+      AC_LINK_IFELSE([
         AC_LANG_PROGRAM(
           [[#include <stdio.h>
             #include <mpfr.h>
@@ -535,6 +535,8 @@ into the executables are present!
 
 AC_DEFUN([RNA_ENABLE_SIMD],[
 
+  simd_enabled_slices="scalar only"
+
   RNA_ADD_FEATURE([simd],
                   [Speed-up MFE computations using explicit SIMD instructions.],
                   [yes])
@@ -558,6 +560,81 @@ Please consider using the successor option --enable-simd instead.
 
   AS_IF([test "x$enable_simd" != "xno"],[
     ## Check for all supported SIMD features first
+    simd_enabled_slices=""
+
+    AC_MSG_CHECKING([compiler support for ARM NEON instructions])
+
+    ac_save_CFLAGS="$CFLAGS"
+    AC_LANG_PUSH([C])
+
+    AC_COMPILE_IFELSE(
+    [
+      AC_LANG_PROGRAM([[
+                  #include <arm_neon.h>
+                  #include <limits.h>
+                ]],
+                  [[int32x4_t a = vdupq_n_s32(INT_MAX);
+                    int32x4_t b = vdupq_n_s32(INT_MIN);
+                    int32x4_t c = vminq_s32(a, b);
+                    int32_t d[4];
+                    vst1q_s32(d, c);
+                ]])
+    ],
+    [
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([VRNA_WITH_SIMD_NEON], [1], [use ARM NEON implementations])
+      ac_simd_capability_neon=yes
+      SIMD_NEON_FLAGS=""
+      AS_IF([test "x$simd_enabled_slices" = "x"],[
+        simd_enabled_slices="NEON"
+      ],[
+        simd_enabled_slices="${simd_enabled_slices}, NEON"
+      ])
+    ],
+    [
+      AC_MSG_RESULT([no])
+    ])
+
+    AC_LANG_POP([C])
+    CFLAGS="$ac_save_CFLAGS"
+
+    AC_MSG_CHECKING([compiler support for AVX2/FMA instructions])
+
+    ac_save_CFLAGS="$CFLAGS"
+    CFLAGS="$ac_save_CFLAGS -Werror -mavx2 -mfma"
+    AC_LANG_PUSH([C])
+
+    AC_COMPILE_IFELSE(
+    [
+      AC_LANG_PROGRAM([[
+                  #include <immintrin.h>
+                  #include <limits.h>
+                ]],
+                  [[__m256i a = _mm256_set1_epi32(INT_MAX);
+                    __m256i b = _mm256_set1_epi32(INT_MIN);
+                    __m256i c = _mm256_min_epi32(a, b);
+                    int d = _mm256_extract_epi32(c, 0);
+                    return d == INT_MAX;
+                ]])
+    ],
+    [
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([VRNA_WITH_SIMD_AVX2], [1], [use AVX2 implementations])
+      ac_simd_capability_avx2=yes
+      SIMD_AVX2_FLAGS="-mavx2 -mfma"
+      AS_IF([test "x$simd_enabled_slices" = "x"],[
+        simd_enabled_slices="AVX2/FMA"
+      ],[
+        simd_enabled_slices="${simd_enabled_slices}, AVX2/FMA"
+      ])
+    ],
+    [
+      AC_MSG_RESULT([no])
+    ])
+
+    AC_LANG_POP([C])
+    CFLAGS="$ac_save_CFLAGS"
+
     AC_MSG_CHECKING([compiler support for AVX 512 instructions])
 
     ac_save_CFLAGS="$CFLAGS"
@@ -585,6 +662,11 @@ Please consider using the successor option --enable-simd instead.
       AC_DEFINE([VRNA_WITH_SIMD_AVX512], [1], [use AVX 512 implementations])
       ac_simd_capability_avx512f=yes
       SIMD_AVX512_FLAGS="-mavx512f"
+      AS_IF([test "x$simd_enabled_slices" = "x"],[
+        simd_enabled_slices="AVX-512F"
+      ],[
+        simd_enabled_slices="${simd_enabled_slices}, AVX-512F"
+      ])
     ],
     [
       AC_MSG_RESULT([no])
@@ -615,6 +697,11 @@ Please consider using the successor option --enable-simd instead.
       AC_DEFINE([VRNA_WITH_SIMD_SSE41], [1], [use SSE 4.1 implementations])
       ac_simd_capability_sse41=yes
       SIMD_SSE41_FLAGS="-msse4.1"
+      AS_IF([test "x$simd_enabled_slices" = "x"],[
+        simd_enabled_slices="SSE4.1"
+      ],[
+        simd_enabled_slices="${simd_enabled_slices}, SSE4.1"
+      ])
     ],
     [
       AC_MSG_RESULT([no])
@@ -633,9 +720,14 @@ Please consider using the successor option --enable-simd instead.
   ])
 
   AC_SUBST(SIMD_AVX512_FLAGS)
+  AC_SUBST(SIMD_AVX2_FLAGS)
+  AC_SUBST(SIMD_NEON_FLAGS)
   AC_SUBST(SIMD_SSE41_FLAGS)
   AC_SUBST(SETUPCFG_SW_SIMD)
+  AC_SUBST(simd_enabled_slices)
   AM_CONDITIONAL(VRNA_AM_SWITCH_SIMD_AVX512, test "x$ac_simd_capability_avx512f" = "xyes")
+  AM_CONDITIONAL(VRNA_AM_SWITCH_SIMD_AVX2, test "x$ac_simd_capability_avx2" = "xyes")
+  AM_CONDITIONAL(VRNA_AM_SWITCH_SIMD_NEON, test "x$ac_simd_capability_neon" = "xyes")
   AM_CONDITIONAL(VRNA_AM_SWITCH_SIMD_SSE41, test "x$ac_simd_capability_sse41" = "xyes")
 ])
 
@@ -705,5 +797,3 @@ AC_DEFUN([RNA_ENABLE_DEBUG_RNALIB],[
     AX_APPEND_FLAG([-DVRNA_LOG_NO_DEBUG_RNALIB], [RNA_CPPFLAGS])
   ])
 ])
-
-

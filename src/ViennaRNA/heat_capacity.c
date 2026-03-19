@@ -29,6 +29,13 @@ store_results_cb(float  t,
                  void   *data);
 
 
+PRIVATE size_t
+estimate_result_capacity(float         T_min,
+                         float         T_max,
+                         float         h,
+                         unsigned int  m);
+
+
 PUBLIC struct vrna_heat_capacity_s *
 vrna_heat_capacity_simple(const char    *sequence,
                           float         T_min,
@@ -38,12 +45,17 @@ vrna_heat_capacity_simple(const char    *sequence,
 {
   vrna_fold_compound_t        *fc;
   struct vrna_heat_capacity_s *result;
+  vrna_md_t                   md;
 
   result = NULL;
 
   if (sequence) {
+    vrna_md_set_default(&md);
+    md.backtrack    = 0;
+    md.compute_bpp  = 0;
+
     fc = vrna_fold_compound(sequence,
-                            NULL,
+                            &md,
                             VRNA_OPTION_DEFAULT);
 
     result = vrna_heat_capacity(fc, T_min, T_max, h, m);
@@ -66,9 +78,14 @@ vrna_heat_capacity(vrna_fold_compound_t *fc,
 
   if (fc) {
     struct data_collector d;
+    size_t                capacity;
+
+    capacity = estimate_result_capacity(T_min, T_max, h, m);
+    if (capacity == 0)
+      capacity = 1;
 
     d.num_entries       = 0;
-    d.allocated_memory  = 127;
+    d.allocated_memory  = capacity;
     d.data              =
       (struct vrna_heat_capacity_s *)vrna_alloc(sizeof(struct vrna_heat_capacity_s) *
                                                 d.allocated_memory);
@@ -204,6 +221,50 @@ ddiff(float f[],
 
   fp /= ((A * A - B * ((float)(2 * m + 1))) * h * h / 2.);
   return (float)fp;
+}
+
+
+PRIVATE size_t
+estimate_result_capacity(float         T_min,
+                         float         T_max,
+                         float         h,
+                         unsigned int  m)
+{
+  float         tmp;
+  unsigned int  i;
+  size_t        count;
+
+  if (m > 100)
+    m = 100;
+  else if (m == 0)
+    m = 1;
+
+  if (T_min > T_max) {
+    tmp   = T_min;
+    T_min = T_max;
+    T_max = tmp;
+  }
+
+  if (T_min <= -K0)
+    T_min = -K0;
+
+  if (h > (T_max - T_min))
+    h = T_max - T_min;
+
+  if (h <= 0.)
+    return 1;
+
+  tmp = T_min - (float)m * h;
+  for (i = 0; i < 2 * m + 1; i++)
+    tmp += h;
+
+  count = 0;
+  while (tmp <= (T_max + (float)m * h + h)) {
+    count++;
+    tmp += h;
+  }
+
+  return count;
 }
 
 

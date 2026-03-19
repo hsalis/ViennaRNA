@@ -9,6 +9,9 @@
 #define VRNA_CPU_SIMD_AVX       16U
 #define VRNA_CPU_SIMD_AVX2      32U
 #define VRNA_CPU_SIMD_AVX512F   64U
+#define VRNA_CPU_SIMD_NEON      128U
+#define VRNA_CPU_SIMD_AVX512BW  256U
+#define VRNA_CPU_SIMD_AVX512VL  512U
 
 
 char *

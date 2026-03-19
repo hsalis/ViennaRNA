@@ -1,0 +1,9 @@
+{
+  "task": "fold",
+  "cases": 90,
+  "differences": 0,
+  "old_total_median_ns": 19866853540,
+  "new_total_median_ns": 9499693790,
+  "runtime_ratio": 0.47816800838005274,
+  "difference_ids": []
+}

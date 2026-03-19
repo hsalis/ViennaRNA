@@ -1,0 +1,13 @@
+{
+  "task": "cofold",
+  "cases": 30,
+  "differences": 0,
+  "old_total_median_ns": 1011438720,
+  "new_total_median_ns": 747649224,
+  "runtime_ratio": 0.739193793174143,
+  "runtime_ratio_ci95_low": 0.6951118775125859,
+  "runtime_ratio_ci95_high": 0.7830422113764554,
+  "significance_threshold": 0.95,
+  "speedup_significant": true,
+  "difference_ids": []
+}

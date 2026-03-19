@@ -1,0 +1,89 @@
+{
+  "seed": 1729,
+  "total_dimers": 30,
+  "total_differences": 0,
+  "workload_runtime": {
+    "new_median_ns": 859711959,
+    "new_best_ns": 859711959,
+    "new_ns_per_dimer": 28657065.3,
+    "old_median_ns": 1115720875,
+    "old_best_ns": 1115720875,
+    "old_ns_per_dimer": 37190695.833333336,
+    "new_over_old_ratio": 0.7705439400333888
+  },
+  "combo_summary": {
+    "50x50": {
+      "count": 4,
+      "diff_count": 0,
+      "median_new_wall_ns": 6316813,
+      "median_old_wall_ns": 6634917,
+      "median_new_over_old_runtime": 0.9149726010101749,
+      "max_abs_energy_delta": 0.0
+    },
+    "50x100": {
+      "count": 4,
+      "diff_count": 0,
+      "median_new_wall_ns": 10943291,
+      "median_old_wall_ns": 14818187,
+      "median_new_over_old_runtime": 0.750861083094424,
+      "max_abs_energy_delta": 0.0
+    },
+    "50x200": {
+      "count": 4,
+      "diff_count": 0,
+      "median_new_wall_ns": 29102479,
+      "median_old_wall_ns": 47765833,
+      "median_new_over_old_runtime": 0.6089564890339906,
+      "max_abs_energy_delta": 0.0
+    },
+    "100x50": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 11685125,
+      "median_old_wall_ns": 12667166,
+      "median_new_over_old_runtime": 0.9459826332870194,
+      "max_abs_energy_delta": 0.0
+    },
+    "100x100": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 19605542,
+      "median_old_wall_ns": 23363708,
+      "median_new_over_old_runtime": 0.8378284387142055,
+      "max_abs_energy_delta": 0.0
+    },
+    "100x200": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 43459834,
+      "median_old_wall_ns": 64100125,
+      "median_new_over_old_runtime": 0.6837402654989885,
+      "max_abs_energy_delta": 0.0
+    },
+    "200x50": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 30468958,
+      "median_old_wall_ns": 32370958,
+      "median_new_over_old_runtime": 0.9412436295521436,
+      "max_abs_energy_delta": 0.0
+    },
+    "200x100": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 40519167,
+      "median_old_wall_ns": 46030542,
+      "median_new_over_old_runtime": 0.8938542976704634,
+      "max_abs_energy_delta": 0.0
+    },
+    "200x200": {
+      "count": 3,
+      "diff_count": 0,
+      "median_new_wall_ns": 77016666,
+      "median_old_wall_ns": 98603208,
+      "median_new_over_old_runtime": 0.7810766765316601,
+      "max_abs_energy_delta": 0.0
+    }
+  },
+  "differences": []
+}

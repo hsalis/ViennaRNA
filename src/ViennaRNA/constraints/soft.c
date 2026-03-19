@@ -661,6 +661,9 @@ vrna_sc_add_bp_comparative_seq(vrna_fold_compound_t *fc,
     is    = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
     js    = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
     es    = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * fc->n_seq);
+    memset(is, 0, sizeof(unsigned int) * fc->n_seq);
+    memset(js, 0, sizeof(unsigned int) * fc->n_seq);
+    memset(es, 0, sizeof(FLT_OR_DBL) * fc->n_seq);
     is[s] = i;
     js[s] = j;
     es[s] = energy;
@@ -848,6 +851,8 @@ vrna_sc_add_up_comparative_seq(vrna_fold_compound_t *fc,
     } else {
       is    = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
       es    = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * fc->n_seq);
+      memset(is, 0, sizeof(unsigned int) * fc->n_seq);
+      memset(es, 0, sizeof(FLT_OR_DBL) * fc->n_seq);
       is[s] = i;
       es[s] = energy;
 
@@ -1055,6 +1060,8 @@ vrna_sc_add_stack_comparative_seq(vrna_fold_compound_t  *fc,
       (s < fc->n_seq)) {
     is    = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
     es    = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * fc->n_seq);
+    memset(is, 0, sizeof(unsigned int) * fc->n_seq);
+    memset(es, 0, sizeof(FLT_OR_DBL) * fc->n_seq);
     is[s] = i;
     es[s] = energy;
 

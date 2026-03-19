@@ -433,6 +433,15 @@ vrna_bts_size(vrna_bts_t bts);
 
 
 /**
+ *  @brief  Clear all elements from a backtrack stack but keep its capacity
+ *
+ *  @param  bts   The backtrack stack
+ */
+void
+vrna_bts_clear(vrna_bts_t bts);
+
+
+/**
  *  @brief  Get an initialized base pair stack
  *
  *  Base pair stacks are used in the backtracking procedure to store
@@ -523,6 +532,15 @@ vrna_bps_at(vrna_bps_t  bps,
  */
 size_t
 vrna_bps_size(vrna_bps_t bps);
+
+
+/**
+ *  @brief  Clear all elements from a base pair stack but keep its capacity
+ *
+ *  @param  bps   The base pair stack
+ */
+void
+vrna_bps_clear(vrna_bps_t bps);
 
 /**
  *  @}

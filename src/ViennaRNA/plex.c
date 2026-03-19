@@ -86,8 +86,9 @@ encode_seqs(const char  *s1,
             const char  *s2);
 
 
-PRIVATE short *
-encode_seq(const char *seq);
+PRIVATE void
+ensure_encoded_seq_buffers(size_t len1,
+                           size_t len2);
 
 
 PRIVATE void
@@ -265,6 +266,8 @@ PRIVATE vrna_param_t *P = NULL;
 **/
 
 PRIVATE int **c = NULL, **in = NULL, **bx = NULL, **by = NULL, **inx = NULL, **iny = NULL;
+PRIVATE int *plex_position = NULL, *plex_position_j = NULL, *plex_SA = NULL;
+PRIVATE size_t plex_position_cap = 0, plex_sa_cap = 0;
 
 /**
 *** S1, SS1, ... contains the encoded sequence for target and query
@@ -274,6 +277,46 @@ PRIVATE int **c = NULL, **in = NULL, **bx = NULL, **by = NULL, **inx = NULL, **i
 PRIVATE short *S1 = NULL, *SS1 = NULL, *S2 = NULL, *SS2 = NULL; /*contains the sequences*/
 PRIVATE int   n1, n2;                                           /* sequence lengths */
 PRIVATE int   n3, n4; /*sequence length for the duplex*/;
+PRIVATE size_t plex_seq1_cap = 0, plex_seq2_cap = 0;
+
+
+PRIVATE void
+ensure_plex_scan_buffers(size_t  position_len,
+                         size_t  sa_len)
+{
+  if (plex_position_cap < position_len) {
+    plex_position      = (int *)vrna_realloc(plex_position, sizeof(int) * position_len);
+    plex_position_j    = (int *)vrna_realloc(plex_position_j, sizeof(int) * position_len);
+    plex_position_cap  = position_len;
+  }
+
+  if (plex_sa_cap < sa_len) {
+    plex_SA      = (int *)vrna_realloc(plex_SA, sizeof(int) * sa_len);
+    plex_sa_cap  = sa_len;
+  }
+}
+
+
+PRIVATE void
+ensure_encoded_seq_buffers(size_t len1,
+                           size_t len2)
+{
+  size_t need1, need2;
+
+  need1 = len1 + 2;
+  if (plex_seq1_cap < need1) {
+    S1            = (short *)vrna_realloc(S1, sizeof(short) * need1);
+    SS1           = (short *)vrna_realloc(SS1, sizeof(short) * need1);
+    plex_seq1_cap = need1;
+  }
+
+  need2 = len2 + 2;
+  if (plex_seq2_cap < need2) {
+    S2            = (short *)vrna_realloc(S2, sizeof(short) * need2);
+    SS2           = (short *)vrna_realloc(SS2, sizeof(short) * need2);
+    plex_seq2_cap = need2;
+  }
+}
 
 
 /*-----------------------------------------------------------------------duplexfold_XS---------------------------------------------------------------------------*/
@@ -426,10 +469,6 @@ duplexfold_XS(const char  *s1,
     for (i = 0; i <= n3; i++)
       free(c[i]);
     free(c);
-    free(S1);
-    free(S2);
-    free(SS1);
-    free(SS2);
     return mfe;
   } else {
     struc = backtrack_XS(k_min, l_min, access_s1, access_s2, i_flag, j_flag);
@@ -472,10 +511,6 @@ duplexfold_XS(const char  *s1,
   for (i = 0; i <= n3; i++)
     free(c[i]);
   free(c);
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
   return mfe;
 }
 
@@ -978,10 +1013,6 @@ fduplexfold_XS(const char *s1,
   }
   Emin = max;
   if (Emin > threshold) {
-    free(S1);
-    free(S2);
-    free(SS1);
-    free(SS2);
     for (i = 0; i <= n3; i++) {
       free(c[i]);
       free(in[i]);
@@ -1058,10 +1089,6 @@ fduplexfold_XS(const char *s1,
   mfe.opening_backtrack_y = (double)dGy * 0.01;
   mfe.dG1                 = 0;  /* !remove access to complete access array (double) access_s1[lengthx][endx+10] * 0.01; */
   mfe.dG2                 = 0;  /* !remove access to complete access array (double) access_s2[lengthy][endy+10] * 0.01; */
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
   for (i = 0; i <= n3; i++) {
     free(c[i]);
     free(in[i]);
@@ -2015,8 +2042,10 @@ Lduplexfold_XS(const char *s1,
   /**
   *** Position of the high score on the target and query sequence
   **/
-  position    = (int *)vrna_alloc((delta + n1 + 3 + delta) * sizeof(int));
-  position_j  = (int *)vrna_alloc((delta + n1 + 3 + delta) * sizeof(int));
+  ensure_plex_scan_buffers((size_t)(delta + n1 + 3 + delta),
+                           (size_t)5 * 6 * (n2 + 5));
+  position    = plex_position;
+  position_j  = plex_position_j;
   /**
   *** extension penalty, computed only once, further reduce the computation time
   **/
@@ -2071,7 +2100,7 @@ Lduplexfold_XS(const char *s1,
   ***                  * length of the sequence
   **/
 
-  SA = (int *)vrna_alloc(sizeof(int) * 5 * 6 * (n2 + 5));
+  SA = plex_SA;
   for (j = n2 + 4; j >= 0; j--) {
     SA[(j *
         30)]            =
@@ -2366,11 +2395,6 @@ Lduplexfold_XS(const char *s1,
     i++;
   }
   /* printf("MAX: %d",max); */
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
-  free(SA);
   if (max < threshold) {
     find_max_XS(position,
                 position_j,
@@ -2407,8 +2431,6 @@ Lduplexfold_XS(const char *s1,
   for (i = 0; i <= 3; i++)
     free(DJ[i]);
   free(DJ);
-  free(position);
-  free(position_j);
   return NULL;
 }
 
@@ -2799,10 +2821,6 @@ duplexfold(const char *s1,
   for (i = 0; i <= n3; i++)
     free(c[i]);
   free(c);
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
   return mfe;
 }
 
@@ -3198,10 +3216,6 @@ fduplexfold(const char  *s1,
   mfe.energy            = (double)Emin / 100.;
   mfe.energy_backtrack  = (double)dGe / 100.;
   mfe.structure         = struc;
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
   for (i = 0; i <= n3; i++) {
     free(c[i]);
     free(in[i]);
@@ -3899,8 +3913,10 @@ Lduplexfold(const char  *s1,
   /**
   *** Position of the high score on the target and query sequence
   **/
-  position    = (int *)vrna_alloc((delta + n1 + 3 + delta) * sizeof(int));
-  position_j  = (int *)vrna_alloc((delta + n1 + 3 + delta) * sizeof(int));
+  ensure_plex_scan_buffers((size_t)(delta + n1 + 3 + delta),
+                           (size_t)5 * 6 * (n2 + 5));
+  position    = plex_position;
+  position_j  = plex_position_j;
   /**
   *** instead of having 4 2-dim arrays we use a unique 1-dim array
   *** The mapping 2d -> 1D is done based ont the macro
@@ -3915,7 +3931,7 @@ Lduplexfold(const char  *s1,
   ***                  * 6 (number of structures we look at) *
   ***                  * length of the sequence
   **/
-  SA = (int *)vrna_alloc(sizeof(int) * 5 * 6 * (n2 + 5));
+  SA = plex_SA;
   for (j = n2 + 4; j >= 0; j--) {
     SA[(j *
         30)]            =
@@ -4171,10 +4187,6 @@ Lduplexfold(const char  *s1,
     i++;
   }
   /* printf("MAX: %d",max); */
-  free(S1);
-  free(S2);
-  free(SS1);
-  free(SS2);
   if (max < threshold) {
     find_max(position,
              position_j,
@@ -4206,9 +4218,6 @@ Lduplexfold(const char  *s1,
              b_b);
   }
 
-  free(SA);
-  free(position);
-  free(position_j);
   return NULL;
 }
 
@@ -4548,41 +4557,23 @@ encode_seqs(const char  *s1,
   unsigned int i, l;
 
   l   = strlen(s1);
-  S1  = encode_seq(s1);
-  SS1 = (short *)vrna_alloc(sizeof(short) * (l + 1));
+  ensure_encoded_seq_buffers(l, strlen(s2));
+  S1[0] = (short)l;
   /* SS1 exists only for the special X K and I bases and energy_set!=0 */
 
   for (i = 1; i <= l; i++)  /* make numerical encoding of sequence */
-    SS1[i] = alias[S1[i]];  /* for mismatches of nostandard bases */
+    SS1[i] = alias[(S1[i] = (short)encode_char(toupper(s1[i - 1])))]; /* for mismatches of nostandard bases */
+
+  S1[l + 1] = S1[1];
 
   l   = strlen(s2);
-  S2  = encode_seq(s2);
-  SS2 = (short *)vrna_alloc(sizeof(short) * (l + 1));
+  S2[0] = (short)l;
   /* SS2 exists only for the special X K and I bases and energy_set!=0 */
 
   for (i = 1; i <= l; i++)  /* make numerical encoding of sequence */
-    SS2[i] = alias[S2[i]];  /* for mismatches of nostandard bases */
-}
+    SS2[i] = alias[(S2[i] = (short)encode_char(toupper(s2[i - 1])))]; /* for mismatches of nostandard bases */
 
-
-PRIVATE short *
-encode_seq(const char *sequence)
-{
-  unsigned int  i, l;
-  short         *S;
-
-  l     = strlen(sequence);
-  S     = (short *)vrna_alloc(sizeof(short) * (l + 2));
-  S[0]  = (short)l;
-
-  /* make numerical encoding of sequence */
-  for (i = 1; i <= l; i++)
-    S[i] = (short)encode_char(toupper(sequence[i - 1]));
-
-  /* for circular folding add first base at position n+1 */
-  S[l + 1] = S[1];
-
-  return S;
+  S2[l + 1] = S2[1];
 }
 
 

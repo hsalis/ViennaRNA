@@ -50,9 +50,8 @@ ct2db.1:  ../src/Utils/ct2db.ggo
 
 endif
 
-EXTRA_DIST =  include
+EXTRA_DIST =  RNAlib.texi include
 
 # remove all generated man pages
 maintainer-clean-local:
 	-rm -f $(dist_man_MANS)
-

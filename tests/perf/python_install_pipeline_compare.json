@@ -1,0 +1,49 @@
+{
+  "new_contract": {
+    "pkgpyexecdir": "$(py3execdir)/RNA",
+    "pkgpycachedir": "$(pkgpyexecdir)/__pycache__",
+    "pkgpyexec_LTLIBRARIES": "_RNA.la",
+    "pkgpyexec_DATA": "RNA/__init__.py RNA/RNA.py",
+    "pkgpycache_DATA": "RNA/__pycache__/__init__.@PYTHON3_CACHE_TAG@.pyc RNA/__pycache__/__init__.@PYTHON3_CACHE_OPT1_EXT@ RNA/__pycache__/RNA.@PYTHON3_CACHE_TAG@.pyc RNA/__pycache__/RNA.@PYTHON3_CACHE_OPT1_EXT@",
+    "pkgpyvrnaexecdir": "$(py3execdir)/ViennaRNA",
+    "pkgpyvrnaexec_DATA": "ViennaRNA/__init__.py",
+    "has_install_data_hook": true,
+    "removes__RNA_la": true
+  },
+  "old_contract": {
+    "pkgpyexecdir": "$(py3execdir)/RNA",
+    "pkgpycachedir": "$(pkgpyexecdir)/__pycache__",
+    "pkgpyexec_LTLIBRARIES": "_RNA.la",
+    "pkgpyexec_DATA": "RNA/__init__.py RNA/RNA.py",
+    "pkgpycache_DATA": "RNA/__pycache__/__init__.@PYTHON3_CACHE_TAG@.pyc RNA/__pycache__/__init__.@PYTHON3_CACHE_OPT1_EXT@ RNA/__pycache__/RNA.@PYTHON3_CACHE_TAG@.pyc RNA/__pycache__/RNA.@PYTHON3_CACHE_OPT1_EXT@",
+    "pkgpyvrnaexecdir": "$(py3execdir)/ViennaRNA",
+    "pkgpyvrnaexec_DATA": "ViennaRNA/__init__.py",
+    "has_install_data_hook": true,
+    "removes__RNA_la": true
+  },
+  "contract_match": true,
+  "new_install_dry_run": [
+    "cd ../.. && /bin/sh /Users/howardsalis/ViennaRNA/config/missing automake-1.18 --foreign interfaces/Python/Makefile",
+    "cd ../.. && /bin/sh ./config.status interfaces/Python/Makefile depfiles",
+    "config.status: creating interfaces/Python/Makefile",
+    "config.status: executing depfiles commands",
+    ":",
+    "list='RNA/__pycache__/__init__.cpython-311.pyc RNA/__pycache__/__init__.cpython-311.opt-1.pyc RNA/__pycache__/RNA.cpython-311.pyc RNA/__pycache__/RNA.cpython-311.opt-1.pyc'; test -n \"$SITE/RNA/__pycache__\" || list=; \\",
+    "if test -n \"$list\"; then \\",
+    "echo \" mkdir -p '$SITE/RNA/__pycache__'\"; \\",
+    "mkdir -p \"$SITE/RNA/__pycache__\" || exit 1; \\",
+    "fi; \\",
+    "for p in $list; do \\",
+    "if test -f \"$p\"; then d=; else d=\"./\"; fi; \\",
+    "echo \"$d$p\"; \\",
+    "done | sed '$!N;$!N;$!N;$!N;$!N;$!N;$!N;s/\\n/ /g' | sed '$!N;$!N;$!N;$!N;s/\\n/ /g' | \\",
+    "while read files; do \\",
+    "echo \" /usr/bin/install -c -m 644 $files '$SITE/RNA/__pycache__'\"; \\",
+    "/usr/bin/install -c -m 644 $files \"$SITE/RNA/__pycache__\" || exit $?; \\",
+    "done",
+    ":",
+    "/Applications/Xcode.app/Contents/Developer/usr/bin/make  install-data-hook",
+    "rm -f $SITE/RNA/_RNA.la"
+  ],
+  "old_install_dry_run_error": "Command '['make', '-n', '-C', '/Users/howardsalis/ViennaRNA/old/ViennaRNA/interfaces/Python', 'install-data']' returned non-zero exit status 2."
+}

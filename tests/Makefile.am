@@ -7,7 +7,7 @@ AM_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS) @CHECK_CFLAGS@
 AM_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS)
 AM_LDFLAGS = $(RNA_LDFLAGS) $(PTHREAD_LIBS)
 
-LDADD = $(top_builddir)/src/ViennaRNA/libRNA_conv.la @CHECK_LIBS@
+LDADD = $(top_builddir)/src/ViennaRNA/libRNA.la @CHECK_LIBS@
 
 if VRNA_AM_SWITCH_MPFR
 LDADD += $(MPFR_LIBS)
@@ -233,6 +233,43 @@ TESTS = \
       ${PYTHON2_TESTS} \
       ${PYTHON3_TESTS}
 
+noinst_PROGRAMS = \
+                  perf/rnafold_mfe_bench \
+                  perf/rnacofold_mfe_bench \
+                  perf/rnacofold_pf_bench \
+                  perf/rnaalifold_mfe_bench \
+                  perf/rnaalifold_pf_bench \
+                  perf/rnasubopt_bench \
+                  perf/rna_window_bench \
+                  perf/duplex_bench \
+                  perf/plex_bench \
+                  perf/heat_capacity_bench \
+                  perf/sampling_bench \
+                  perf/findpath_bench \
+                  perf/part_func_up_bench \
+                  perf/inverse_bench \
+                  perf/twoDfold_bench \
+                  perf/twoDpfold_bench \
+                  perf/vrna_api_compare_worker
+
+perf_rnafold_mfe_bench_SOURCES = perf/rnafold_mfe_bench.c
+perf_rnacofold_mfe_bench_SOURCES = perf/rnacofold_mfe_bench.c
+perf_rnacofold_pf_bench_SOURCES = perf/rnacofold_pf_bench.c
+perf_rnaalifold_mfe_bench_SOURCES = perf/rnaalifold_mfe_bench.c
+perf_rnaalifold_pf_bench_SOURCES = perf/rnaalifold_pf_bench.c
+perf_rnasubopt_bench_SOURCES = perf/rnasubopt_bench.c
+perf_rna_window_bench_SOURCES = perf/rna_window_bench.c
+perf_duplex_bench_SOURCES = perf/duplex_bench.c
+perf_plex_bench_SOURCES = perf/plex_bench.c
+perf_heat_capacity_bench_SOURCES = perf/heat_capacity_bench.c
+perf_sampling_bench_SOURCES = perf/sampling_bench.c
+perf_findpath_bench_SOURCES = perf/findpath_bench.c
+perf_part_func_up_bench_SOURCES = perf/part_func_up_bench.c
+perf_inverse_bench_SOURCES = perf/inverse_bench.c
+perf_twoDfold_bench_SOURCES = perf/twoDfold_bench.c
+perf_twoDpfold_bench_SOURCES = perf/twoDpfold_bench.c
+perf_vrna_api_compare_worker_SOURCES = perf/vrna_api_compare_worker.c
+
 ## Below are the rules how to create the test suite executables
 ## See checkmk man page for details about *.ts files
 .ts.c:
@@ -241,6 +278,22 @@ TESTS = \
 endif
 
 EXTRA_DIST =  data \
+              perf/rnafold_mfe_bench.c \
+              perf/rnacofold_mfe_bench.c \
+              perf/rnacofold_pf_bench.c \
+              perf/rnaalifold_mfe_bench.c \
+              perf/rnaalifold_pf_bench.c \
+              perf/rnasubopt_bench.c \
+              perf/rna_window_bench.c \
+              perf/duplex_bench.c \
+              perf/plex_bench.c \
+              perf/heat_capacity_bench.c \
+              perf/sampling_bench.c \
+              perf/findpath_bench.c \
+              perf/part_func_up_bench.c \
+              perf/inverse_bench.c \
+              perf/twoDfold_bench.c \
+              perf/twoDpfold_bench.c \
               py_include/__init__.py \
               py_include/taprunner/__init__.py \
               RNAfold/results \

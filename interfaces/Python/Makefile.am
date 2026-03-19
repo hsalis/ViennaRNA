@@ -62,11 +62,11 @@ EXTRA_DIST = \
 
 _RNA_la_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS)
 _RNA_la_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS) -Wno-unused-label -Wno-unused-variable
-_RNA_la_CPPFLAGS = -I$(PYTHON3_INC) $(RNA_CPPFLAGS) -I$(top_srcdir)/src
+_RNA_la_CPPFLAGS = -I$(PYTHON3_INC) $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src
 
 _RNA_la_LIBADD = \
     $(LDADD) \
-    $(top_builddir)/src/ViennaRNA/libRNA_conv.la
+    $(top_builddir)/src/ViennaRNA/libRNA.la
 
 if VRNA_AM_SWITCH_SVM
 _RNA_la_LIBADD += -lstdc++
@@ -121,6 +121,8 @@ endif WITH_REFERENCE_MANUAL_XML
 $(SWIG_wrapper): $(SWIG_src) $(INTERFACE_FILES)
 	$(swig_verbose)$(SWIG) \
                   -I$(top_srcdir)/src \
+                  -I$(top_builddir)/interfaces \
+                  -I$(top_srcdir)/interfaces \
                   -I$(srcdir) \
                   -I$(builddir) \
                   $(doxy2swig_pydoc_define) \

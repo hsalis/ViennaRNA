@@ -27,7 +27,9 @@ endif WITH_REFERENCE_MANUAL_BUILD
 
 endif WITH_REFERENCE_MANUAL
 
+if WITH_REFERENCE_MANUAL_BUILD
 noinst_DATA = $(REFERENCE_MANUAL_FILES_XML)
+endif
 
 EXTRA_DIST =  DoxygenLayout.xml \
               doxygen-xml \

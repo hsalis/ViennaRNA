@@ -21,6 +21,8 @@
 #include "ViennaRNA/partfunc/multibranch.h"
 
 #include "ViennaRNA/intern/grammar_dat.h"
+#include "ViennaRNA/intern/pf_profile.h"
+#include "ViennaRNA/intern/pf_scratch.h"
 
 #ifdef __GNUC__
 # define INLINE inline
@@ -95,10 +97,16 @@ vrna_exp_E_mb_loop_fast(vrna_fold_compound_t        *fc,
                         int                         j,
                         struct vrna_mx_pf_aux_ml_s  *aux_mx)
 {
+  uint64_t   t0 = 0;
   FLT_OR_DBL q = 0.;
 
-  if ((fc) && (aux_mx))
+  if ((fc) && (aux_mx)) {
+    if (vrna_pf_profile_enabled())
+      t0 = vrna_pf_profile_now();
     q = exp_E_mb_loop_fast(fc, i, j, aux_mx);
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_add_multibranch(vrna_pf_profile_now() - t0);
+  }
 
   return q;
 }
@@ -110,10 +118,16 @@ vrna_exp_E_ml_fast(vrna_fold_compound_t       *fc,
                    int                        j,
                    struct vrna_mx_pf_aux_ml_s *aux_mx)
 {
+  uint64_t   t0 = 0;
   FLT_OR_DBL q = 0.;
 
-  if ((fc) && (aux_mx))
+  if ((fc) && (aux_mx)) {
+    if (vrna_pf_profile_enabled())
+      t0 = vrna_pf_profile_now();
     q = exp_E_ml_fast(fc, i, j, aux_mx);
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_add_multibranch(vrna_pf_profile_now() - t0);
+  }
 
   return q;
 }
@@ -125,10 +139,16 @@ vrna_exp_E_m2_fast(vrna_fold_compound_t       *fc,
                    int                        j,
                    struct vrna_mx_pf_aux_ml_s *aux_mx)
 {
+  uint64_t   t0 = 0;
   FLT_OR_DBL q = 0.;
 
-  if ((fc) && (aux_mx))
+  if ((fc) && (aux_mx)) {
+    if (vrna_pf_profile_enabled())
+      t0 = vrna_pf_profile_now();
     q = exp_E_m2_fast(fc, i, j, aux_mx);
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_add_multibranch(vrna_pf_profile_now() - t0);
+  }
 
   return q;
 }
@@ -148,15 +168,28 @@ vrna_exp_E_ml_fast_init(vrna_fold_compound_t *fc)
     iidx  = fc->iindx;
     turn  = fc->exp_params->model_details.min_loop_size;
     qm    = fc->exp_matrices->qm;
+    aux_mx = (fc->exp_matrices && fc->exp_matrices->aux_pf) ?
+             ((vrna_pf_scratch_t *)fc->exp_matrices->aux_pf)->ml_helpers :
+             NULL;
 
-    /* allocate memory for helper arrays */
-    aux_mx = (struct vrna_mx_pf_aux_ml_s *)vrna_alloc(sizeof(struct vrna_mx_pf_aux_ml_s));
-    aux_mx->qqm       = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qqm1      = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qqm2      = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qqm21     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qqmu_size = 0;
-    aux_mx->qqmu      = NULL;
+    if (!aux_mx) {
+      aux_mx = (struct vrna_mx_pf_aux_ml_s *)vrna_alloc(sizeof(struct vrna_mx_pf_aux_ml_s));
+      aux_mx->qqm       = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qqm1      = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qqm2      = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qqm21     = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qqmu_size = 0;
+      aux_mx->qqmu      = NULL;
+      vrna_pf_profile_count_alloc(5);
+
+      if (fc->exp_matrices && fc->exp_matrices->aux_pf)
+        ((vrna_pf_scratch_t *)fc->exp_matrices->aux_pf)->ml_helpers = aux_mx;
+    }
+
+    memset(aux_mx->qqm, 0, sizeof(FLT_OR_DBL) * (n + 2));
+    memset(aux_mx->qqm1, 0, sizeof(FLT_OR_DBL) * (n + 2));
+    memset(aux_mx->qqm2, 0, sizeof(FLT_OR_DBL) * (n + 2));
+    memset(aux_mx->qqm21, 0, sizeof(FLT_OR_DBL) * (n + 2));
 
     if (fc->type == VRNA_FC_TYPE_SINGLE) {
       vrna_ud_t     *domains_up = fc->domains_up;
@@ -169,10 +202,23 @@ vrna_exp_E_ml_fast_init(vrna_fold_compound_t *fc)
           if (ud_max_size < domains_up->uniq_motif_size[u])
             ud_max_size = domains_up->uniq_motif_size[u];
 
-        aux_mx->qqmu_size = ud_max_size;
-        aux_mx->qqmu      = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (ud_max_size + 1));
+        if (aux_mx->qqmu_size != ud_max_size) {
+          if (aux_mx->qqmu) {
+            for (u = 0; u <= aux_mx->qqmu_size; u++)
+              free(aux_mx->qqmu[u]);
+
+            free(aux_mx->qqmu);
+          }
+
+          aux_mx->qqmu_size = ud_max_size;
+          aux_mx->qqmu      = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (ud_max_size + 1));
+          for (u = 0; u <= ud_max_size; u++)
+            aux_mx->qqmu[u] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+          vrna_pf_profile_count_alloc(1 + ud_max_size + 1);
+        }
+
         for (u = 0; u <= ud_max_size; u++)
-          aux_mx->qqmu[u] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+          memset(aux_mx->qqmu[u], 0, sizeof(FLT_OR_DBL) * (n + 2));
       }
     }
 

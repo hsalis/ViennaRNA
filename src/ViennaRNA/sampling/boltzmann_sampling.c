@@ -126,12 +126,13 @@ nr_init(vrna_fold_compound_t  *fc,
         unsigned int          end);
 
 
-PRIVATE struct sc_wrappers *
-sc_init(vrna_fold_compound_t *fc);
+PRIVATE void
+sc_prepare(vrna_fold_compound_t *fc,
+           struct sc_wrappers   *sc_wrap);
 
 
 PRIVATE void
-sc_free(struct sc_wrappers *sc_wrap);
+sc_release(struct sc_wrappers *sc_wrap);
 
 
 PRIVATE unsigned int
@@ -289,27 +290,22 @@ vrna_pbacktrack_mem_free(struct vrna_pbacktrack_memory_s *s)
  # BEGIN OF STATIC HELPER FUNCTIONS  #
  #####################################
  */
-PRIVATE struct sc_wrappers *
-sc_init(vrna_fold_compound_t *fc)
+PRIVATE void
+sc_prepare(vrna_fold_compound_t *fc,
+           struct sc_wrappers   *sc_wrap)
 {
-  struct sc_wrappers *sc_wrap = (struct sc_wrappers *)vrna_alloc(sizeof(struct sc_wrappers));
-
   init_sc_ext_exp(fc, &(sc_wrap->sc_wrapper_ext));
   init_sc_int_exp(fc, &(sc_wrap->sc_wrapper_int));
   init_sc_mb_exp(fc, &(sc_wrap->sc_wrapper_ml));
-
-  return sc_wrap;
 }
 
 
 PRIVATE void
-sc_free(struct sc_wrappers *sc_wrap)
+sc_release(struct sc_wrappers *sc_wrap)
 {
   free_sc_ext_exp(&(sc_wrap->sc_wrapper_ext));
   free_sc_int_exp(&(sc_wrap->sc_wrapper_int));
   free_sc_mb_exp(&(sc_wrap->sc_wrapper_ml));
-
-  free(sc_wrap);
 }
 
 
@@ -356,17 +352,17 @@ wrap_pbacktrack(vrna_fold_compound_t            *vc,
                 void                            *data,
                 struct vrna_pbacktrack_memory_s *nr_mem)
 {
-  char                *pstruc;
+  char                *pstruc, *pstruc_buf;
   unsigned int        i;
   int                 ret, pf_overflow, is_dup, *my_iindx;
   FLT_OR_DBL          *q;
   vrna_mx_pf_t        *matrices;
   struct aux_mem      helper_arrays;
-  struct sc_wrappers  *sc_wrap;
+  struct sc_wrappers  sc_wrap;
 
   i           = 0;
   pf_overflow = 0;
-  sc_wrap     = sc_init(vc);
+  sc_prepare(vc, &sc_wrap);
 
   my_iindx  = vc->iindx;
   matrices  = vc->exp_matrices;
@@ -379,18 +375,19 @@ wrap_pbacktrack(vrna_fold_compound_t            *vc,
     helper_arrays.qik[i] = q[my_iindx[start] - i];
 
   helper_arrays.qik[start - 1] = 1.0;
+  pstruc_buf = vrna_alloc(((end - start + 1) + 1) * sizeof(char));
+  pstruc = pstruc_buf - (start - 1);
 
   for (i = 0; i < num_samples; i++) {
     is_dup  = 1;
-    pstruc  = vrna_alloc(((end - start + 1) + 1) * sizeof(char));
-    memset(pstruc, '.', sizeof(char) * (end - start + 1));
-    pstruc -= start - 1;
+    memset(pstruc_buf, '.', sizeof(char) * (end - start + 1));
+    pstruc_buf[end - start + 1] = '\0';
 
 
     if (nr_mem)
       nr_mem->q_remain = vc->exp_matrices->q[vc->iindx[start] - end]; /* really */
 
-    ret = backtrack_ext_loop(start, end, pstruc, vc, &helper_arrays, sc_wrap, nr_mem);
+    ret = backtrack_ext_loop(start, end, pstruc, vc, &helper_arrays, &sc_wrap, nr_mem);
 
     if (nr_mem) {
 #ifdef VRNA_NR_SAMPLING_HASH
@@ -407,13 +404,11 @@ wrap_pbacktrack(vrna_fold_compound_t            *vc,
 
       if (pf_overflow) {
         vrna_log_warning("vrna_pbacktrack_nr*(): %s", info_nr_overflow);
-        free(pstruc + (start - 1));
         break;
       }
 
       if (is_dup) {
         vrna_log_warning("vrna_pbacktrack_nr*(): %s", info_nr_duplicates);
-        free(pstruc + (start - 1));
         break;
       }
     }
@@ -421,16 +416,15 @@ wrap_pbacktrack(vrna_fold_compound_t            *vc,
     if ((ret > 0) && (bs_cb))
       bs_cb(pstruc + (start - 1), data);
 
-    free(pstruc + (start - 1));
-
     if (ret == 0)
       break;
   }
 
+  free(pstruc_buf);
   helper_arrays.qik += start - 1;
   free(helper_arrays.qik);
 
-  sc_free(sc_wrap);
+  sc_release(&sc_wrap);
 
   return i;
 }
@@ -1789,7 +1783,7 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
   vrna_exp_param_t      *pf_params;
   vrna_md_t             *md;
   vrna_mx_pf_t          *matrices;
-  struct sc_wrappers    *sc_wrap;
+  struct sc_wrappers    sc_wrap;
   struct sc_ext_exp_dat *sc_wrapper_ext;
   struct sc_int_exp_dat *sc_wrapper_int;
   struct sc_mb_exp_dat  *sc_wrapper_ml;
@@ -1812,10 +1806,10 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
   hc_mx = vc->hc->mx;
   hc_up = vc->hc->up_int;
 
-  sc_wrap         = sc_init(vc);
-  sc_wrapper_ext  = &(sc_wrap->sc_wrapper_ext);
-  sc_wrapper_int  = &(sc_wrap->sc_wrapper_int);
-  sc_wrapper_ml   = &(sc_wrap->sc_wrapper_ml);
+  sc_prepare(vc, &sc_wrap);
+  sc_wrapper_ext  = &(sc_wrap.sc_wrapper_ext);
+  sc_wrapper_int  = &(sc_wrap.sc_wrapper_int);
+  sc_wrapper_ml   = &(sc_wrap.sc_wrapper_ml);
 
   if (vc->type == VRNA_FC_TYPE_SINGLE) {
     n_seq         = 1;
@@ -1841,11 +1835,11 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
     expMLclosing  = pow(pf_params->expMLclosing, (double)n_seq);
   }
 
+  pstruc = vrna_alloc((n + 1) * sizeof(char));
   for (count = 0; count < num_samples; count++) {
-    pstruc = vrna_alloc((n + 1) * sizeof(char));
-
     /* initialize pstruct with single bases  */
     memset(pstruc, '.', sizeof(char) * n);
+    pstruc[n] = '\0';
 
     qt = scale[n];
 
@@ -1884,7 +1878,7 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
 
         /* found a hairpin? so backtrack in the enclosed part and we're done  */
         if (qt > r) {
-          backtrack(i, j, pstruc, vc, sc_wrap, NULL);
+          backtrack(i, j, pstruc, vc, &sc_wrap, NULL);
           goto pbacktrack_circ_loop_end;
         }
 
@@ -1967,8 +1961,8 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
                  * forward and backtracking the both enclosed parts and we're done
                  */
                 if (qt > r) {
-                  backtrack(i, j, pstruc, vc, sc_wrap, NULL);
-                  backtrack(k, l, pstruc, vc, sc_wrap, NULL);
+                  backtrack(i, j, pstruc, vc, &sc_wrap, NULL);
+                  backtrack(k, l, pstruc, vc, &sc_wrap, NULL);
                   goto pbacktrack_circ_loop_end;
                 }
               }
@@ -1995,8 +1989,8 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
 
 
         if (qt > r) {
-          backtrack_qm1(vc, k, pstruc, sc_wrap, NULL);
-          backtrack_qm2(vc, k, n, pstruc, sc_wrap, NULL);
+          backtrack_qm1(vc, k, pstruc, &sc_wrap, NULL);
+          backtrack_qm2(vc, k, n, pstruc, &sc_wrap, NULL);
           goto pbacktrack_circ_loop_end;
         }
       }
@@ -2007,8 +2001,8 @@ pbacktrack_circ(vrna_fold_compound_t  *vc,
               expMLclosing;
 
         if (qt > r) {
-          backtrack_qm1(vc, k, pstruc, sc_wrap, NULL);
-          backtrack_qm2(vc, k + 1, n, pstruc, sc_wrap, NULL);
+          backtrack_qm1(vc, k, pstruc, &sc_wrap, NULL);
+          backtrack_qm2(vc, k + 1, n, pstruc, &sc_wrap, NULL);
           goto pbacktrack_circ_loop_end;
         }
       }
@@ -2025,10 +2019,10 @@ pbacktrack_circ_loop_end:
     if (bs_cb)
       bs_cb(pstruc, data);
 
-    free(pstruc);
   }
 
-  sc_free(sc_wrap);
+  free(pstruc);
+  sc_release(&sc_wrap);
 
   return count;
 }

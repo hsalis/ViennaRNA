@@ -4,7 +4,7 @@ include $(top_srcdir)/silent_rules.mk
 
 AM_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS)
 AM_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS)
-AM_CPPFLAGS = $(RNA_CPPFLAGS) -I$(top_srcdir)/src ${JSON_INC}
+AM_CPPFLAGS = $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src ${JSON_INC}
 AM_LDFLAGS = $(RNA_LDFLAGS) $(PTHREAD_LIBS)
 
 SUBDIRS = static @NAVIEW_DIR@
@@ -76,7 +76,10 @@ libRNA_ladir = $(includedir)/ViennaRNA
 libRNA_la_SOURCES = 
 
 # ldflags to avoid version information
-libRNA_la_LIBADD = libRNA_conv.la
+libRNA_la_LIBADD = \
+    libRNA_conv.la \
+    $(libRNA_conv_la_LIBADD) \
+    libRNA_special_const.la
 libRNA_la_LDFLAGS = -avoid-version -static $(LTO_LDFLAGS) $(PTHREAD_LIBS)
 
 libRNA_concentrations_la_CPPFLAGS = $(AM_CPPFLAGS) $(DLIB_CPPFLAGS)
@@ -116,10 +119,22 @@ libRNA_conv_la_LIBADD += libRNA_utils_sse41.la
 libRNA_utils_sse41_la_CFLAGS = $(SIMD_SSE41_FLAGS)
 endif
 
+if VRNA_AM_SWITCH_SIMD_AVX2
+noinst_LTLIBRARIES += libRNA_utils_avx2.la
+libRNA_conv_la_LIBADD += libRNA_utils_avx2.la
+libRNA_utils_avx2_la_CFLAGS = $(SIMD_AVX2_FLAGS)
+endif
+
 if VRNA_AM_SWITCH_SIMD_AVX512
 noinst_LTLIBRARIES += libRNA_utils_avx512.la
 libRNA_conv_la_LIBADD += libRNA_utils_avx512.la
 libRNA_utils_avx512_la_CFLAGS = $(SIMD_AVX512_FLAGS)
+endif
+
+if VRNA_AM_SWITCH_SIMD_NEON
+noinst_LTLIBRARIES += libRNA_utils_neon.la
+libRNA_conv_la_LIBADD += libRNA_utils_neon.la
+libRNA_utils_neon_la_CFLAGS = $(SIMD_NEON_FLAGS)
 endif
 
 # Dummy C++ source to cause C++ linking.
@@ -599,9 +614,19 @@ libRNA_utils_sse41_la_SOURCES = \
     utils/higher_order_functions_sse41.c
 endif
 
+if VRNA_AM_SWITCH_SIMD_AVX2
+libRNA_utils_avx2_la_SOURCES = \
+    utils/higher_order_functions_avx2.c
+endif
+
 if VRNA_AM_SWITCH_SIMD_AVX512
 libRNA_utils_avx512_la_SOURCES = \
     utils/higher_order_functions_avx512.c
+endif
+
+if VRNA_AM_SWITCH_SIMD_NEON
+libRNA_utils_neon_la_SOURCES = \
+    utils/higher_order_functions_neon.c
 endif
 
 libRNA_plotting_la_SOURCES = \
@@ -621,6 +646,7 @@ libRNA_plotting_la_SOURCES = \
 
 libRNA_mfe_la_SOURCES = \
     mfe/mfe.c \
+    mfe/mfe_profile.c \
     mfe/mfe_window.c \
     mfe/mfe_wrappers.c \
     mfe/mfe_window_wrappers.c \
@@ -647,6 +673,7 @@ libRNA_backtrack_la_SOURCES = \
 
 libRNA_partfunc_la_SOURCES = \
     partfunc/partfunc.c \
+    partfunc/pf_profile.c \
     partfunc/pf_window.c \
     partfunc/pf_wrappers.c \
     partfunc/pf_multifold.c \

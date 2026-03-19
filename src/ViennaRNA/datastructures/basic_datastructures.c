@@ -128,6 +128,14 @@ vrna_bts_size(vrna_bts_t bts)
 }
 
 
+PUBLIC void
+vrna_bts_clear(vrna_bts_t bts)
+{
+  if (bts)
+    vrna_array_size(bts->stack) = 0;
+}
+
+
 PUBLIC vrna_bps_t
 vrna_bps_init(size_t  n)
 {
@@ -209,6 +217,14 @@ vrna_bps_size(vrna_bps_t bps)
     return vrna_array_size(bps->pairs);
   
   return 0;
+}
+
+
+PUBLIC void
+vrna_bps_clear(vrna_bps_t bps)
+{
+  if (bps)
+    vrna_array_size(bps->pairs) = 0;
 }
 
 

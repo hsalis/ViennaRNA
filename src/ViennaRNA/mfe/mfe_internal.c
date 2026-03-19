@@ -18,6 +18,9 @@
 #include "ViennaRNA/structured_domains.h"
 #include "ViennaRNA/unstructured_domains.h"
 #include "ViennaRNA/eval/internal.h"
+#include "ViennaRNA/params/salt.h"
+#include "ViennaRNA/intern/mfe_profile.h"
+#include "ViennaRNA/intern/mfe_scratch.h"
 
 
 #ifdef __GNUC__
@@ -35,6 +38,8 @@ typedef struct {
   struct sc_int_dat     sc_wrapper;
 
   unsigned int          *tt;
+  unsigned int          tt_size;
+  unsigned char         owns_tt;
 } helper_data_t;
 
 
@@ -51,6 +56,12 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
 
 
 PRIVATE int
+mfe_internal_loop_single_fast(vrna_fold_compound_t  *fc,
+                              unsigned int          i,
+                              unsigned int          j);
+
+
+PRIVATE int
 mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
                       unsigned int          i,
                       unsigned int          j,
@@ -58,10 +69,11 @@ mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
                       unsigned int          *iq);
 
 
-PRIVATE helper_data_t *
-get_intloop_helpers(vrna_fold_compound_t  *fc,
-                    unsigned int          i,
-                    unsigned int          j);
+PRIVATE void
+prepare_intloop_helpers(helper_data_t        *h,
+                        vrna_fold_compound_t  *fc,
+                        unsigned int          i,
+                        unsigned int          j);
 
 
 PRIVATE void
@@ -82,6 +94,40 @@ mfe_bulges(vrna_fold_compound_t *fc,
            helper_data_t        *helpers);
 
 
+PRIVATE INLINE unsigned int
+ptype_fast(char          *ptype,
+           unsigned int  ij);
+
+
+PRIVATE INLINE unsigned char
+use_internal_single_fast_path(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE unsigned char
+use_comparative_sc_fallback(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE unsigned char
+hc_int_linear_fast(vrna_hc_t      *hc,
+                   unsigned int   n,
+                   unsigned int   i,
+                   unsigned int   j,
+                   unsigned int   k,
+                   unsigned int   l);
+
+
+PRIVATE INLINE int
+mfe_E_internal_single_fast(unsigned int  n1,
+                           unsigned int  n2,
+                           unsigned int  type,
+                           unsigned int  type_2,
+                           int           si1,
+                           int           sj1,
+                           int           sp1,
+                           int           sq1,
+                           vrna_param_t  *P);
+
+
 /*
  #################################
  # BEGIN OF FUNCTION DEFINITIONS #
@@ -92,8 +138,23 @@ vrna_mfe_internal(vrna_fold_compound_t  *fc,
                   unsigned int          i,
                   unsigned int          j)
 {
-  if (fc)
-    return mfe_internal_loop(fc, i, j);
+  if (fc) {
+    uint64_t  t0  = 0;
+    int       ret;
+
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    if (use_internal_single_fast_path(fc))
+      ret = mfe_internal_loop_single_fast(fc, i, j);
+    else
+      ret = mfe_internal_loop(fc, i, j);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_internal(vrna_mfe_profile_now() - t0);
+
+    return ret;
+  }
 
   return INF;
 }
@@ -118,30 +179,260 @@ vrna_mfe_internal_ext(vrna_fold_compound_t  *fc,
  # BEGIN OF STATIC HELPER FUNCTIONS  #
  #####################################
  */
-PRIVATE helper_data_t *
-get_intloop_helpers(vrna_fold_compound_t  *fc,
-                    unsigned int          i,
-                    unsigned int          j)
+PRIVATE INLINE unsigned int
+ptype_fast(char          *ptype,
+           unsigned int  ij)
 {
-  helper_data_t *h = (helper_data_t *)vrna_alloc(sizeof(helper_data_t));
+  unsigned int tt = (unsigned int)ptype[ij];
 
+  return (tt == 0) ? 7U : tt;
+}
+
+
+PRIVATE INLINE unsigned char
+use_internal_single_fast_path(vrna_fold_compound_t *fc)
+{
+  vrna_md_t *md;
+  vrna_sc_t *sc;
+
+  if ((!fc) ||
+      (fc->type != VRNA_FC_TYPE_SINGLE) ||
+      (fc->strands != 1) ||
+      (!fc->params) ||
+      (!fc->hc) ||
+      (!fc->matrices) ||
+      (fc->hc->type == VRNA_HC_WINDOW) ||
+      (fc->domains_up))
+    return 0;
+
+  md = &(fc->params->model_details);
+  sc = fc->sc;
+
+  if ((md->circ) ||
+      (md->gquad) ||
+      (fc->hc->f))
+    return 0;
+
+  if (!sc)
+    return 1;
+
+  if ((sc->f) ||
+      (sc->exp_f) ||
+      (sc->bt) ||
+      (sc->energy_up) ||
+      (sc->energy_bp) ||
+      (sc->energy_bp_local) ||
+      (sc->energy_stack))
+    return 0;
+
+  return 1;
+}
+
+
+PRIVATE INLINE unsigned char
+use_comparative_sc_fallback(vrna_fold_compound_t *fc)
+{
+  unsigned int s;
+
+  if ((!fc) ||
+      (fc->type != VRNA_FC_TYPE_COMPARATIVE) ||
+      (!fc->scs))
+    return 0;
+
+  for (s = 0; s < fc->n_seq; s++) {
+    vrna_sc_t *sc = fc->scs[s];
+
+    if ((!sc))
+      continue;
+
+    if ((sc->f) ||
+        (sc->exp_f) ||
+        (sc->bt) ||
+        (sc->energy_up) ||
+        (sc->energy_bp) ||
+        (sc->energy_bp_local) ||
+        (sc->energy_stack))
+      return 1;
+  }
+
+  return 0;
+}
+
+
+PRIVATE INLINE unsigned char
+hc_int_linear_fast(vrna_hc_t      *hc,
+                   unsigned int   n,
+                   unsigned int   i,
+                   unsigned int   j,
+                   unsigned int   k,
+                   unsigned int   l)
+{
+  unsigned char pij, pkl;
+  unsigned int  u1, u2;
+
+  pij = hc->mx[n * i + j];
+  pkl = hc->mx[n * k + l];
+
+  if (!(pij & VRNA_CONSTRAINT_CONTEXT_INT_LOOP))
+    return 0;
+
+  if (!(pkl & VRNA_CONSTRAINT_CONTEXT_INT_LOOP_ENC))
+    return 0;
+
+  u1 = k - i - 1;
+  u2 = j - l - 1;
+
+  if ((u1 != 0) && (hc->up_int[i + 1] < u1))
+    return 0;
+
+  if ((u2 != 0) && (hc->up_int[l + 1] < u2))
+    return 0;
+
+  return 1;
+}
+
+
+PRIVATE INLINE int
+mfe_E_internal_single_fast(unsigned int  n1,
+                           unsigned int  n2,
+                           unsigned int  type,
+                           unsigned int  type_2,
+                           int           si1,
+                           int           sj1,
+                           int           sp1,
+                           int           sq1,
+                           vrna_param_t  *P)
+{
+  unsigned int  nl, ns, u, backbones, no_close;
+  int           energy, salt_stack_correction, salt_loop_correction;
+
+  no_close              = 0;
+  salt_stack_correction = P->SaltStack;
+  salt_loop_correction  = 0;
+
+  if ((P->model_details.noGUclosure) &&
+      ((type_2 == 3) || (type_2 == 4) || (type == 3) || (type == 4)))
+    no_close = 1;
+
+  if (n1 > n2) {
+    nl  = n1;
+    ns  = n2;
+  } else {
+    nl  = n2;
+    ns  = n1;
+  }
+
+  if (nl == 0)
+    return P->stack[type][type_2] + salt_stack_correction;
+
+  if (no_close)
+    return INF;
+
+  if (P->model_details.salt != VRNA_MODEL_DEFAULT_SALT) {
+    backbones = nl + ns + 2;
+    if (backbones <= MAXLOOP + 1)
+      salt_loop_correction = P->SaltLoop[backbones];
+    else
+      salt_loop_correction = vrna_salt_loop_int((int)backbones,
+                                                P->model_details.salt,
+                                                P->temperature + K0,
+                                                P->model_details.backbone_length);
+  }
+
+  energy = 0;
+
+  switch (ns) {
+    case 0:
+      energy = (nl <= MAXLOOP) ?
+               P->bulge[nl] :
+               (P->bulge[30] + (int)(P->lxc * log(nl / 30.)));
+      if (nl == 1) {
+        energy += P->stack[type][type_2];
+      } else {
+        if (type > 2)
+          energy += P->TerminalAU;
+
+        if (type_2 > 2)
+          energy += P->TerminalAU;
+      }
+      break;
+
+    case 1:
+      if (nl == 1) {
+        energy = P->int11[type][type_2][si1][sj1];
+      } else if (nl == 2) {
+        if (n1 == 1)
+          energy = P->int21[type][type_2][si1][sq1][sj1];
+        else
+          energy = P->int21[type_2][type][sq1][si1][sp1];
+      } else {
+        energy = (nl + 1 <= MAXLOOP) ?
+                 P->internal_loop[nl + 1] :
+                 (P->internal_loop[30] + (int)(P->lxc * log((nl + 1) / 30.)));
+        energy += MIN2(MAX_NINIO, (int)(nl - ns) * P->ninio[2]);
+        energy += P->mismatch1nI[type][si1][sj1] +
+                  P->mismatch1nI[type_2][sq1][sp1];
+      }
+      break;
+
+    case 2:
+      if (nl == 2) {
+        energy = P->int22[type][type_2][si1][sp1][sq1][sj1];
+        break;
+      } else if (nl == 3) {
+        energy = P->internal_loop[5] +
+                 P->ninio[2];
+        energy += P->mismatch23I[type][si1][sj1] +
+                  P->mismatch23I[type_2][sq1][sp1];
+        break;
+      }
+      /* fall through */
+
+    default:
+      u       = nl + ns;
+      energy  = (u <= MAXLOOP) ?
+                P->internal_loop[u] :
+                (P->internal_loop[30] + (int)(P->lxc * log(u / 30.)));
+      energy += MIN2(MAX_NINIO, (int)(nl - ns) * P->ninio[2]);
+      energy += P->mismatchI[type][si1][sj1] +
+                P->mismatchI[type_2][sq1][sp1];
+      break;
+  }
+
+  return energy + salt_loop_correction;
+}
+
+
+PRIVATE void
+prepare_intloop_helpers(helper_data_t        *h,
+                        vrna_fold_compound_t  *fc,
+                        unsigned int          i,
+                        unsigned int          j)
+{
   /* init soft constraints wrapper */
   init_sc_int(fc, &(h->sc_wrapper));
+  h->owns_tt = 0;
 
 
   if (fc->type == VRNA_FC_TYPE_COMPARATIVE) {
-    vrna_md_t *md = &(fc->params->model_details);
-    short     **S = fc->S;
+    vrna_mfe_scratch_t  *scratch = (vrna_mfe_scratch_t *)fc->matrices->aux_mfe;
+    vrna_md_t           *md = &(fc->params->model_details);
+    short               **S = fc->S;
 
-    h->tt = (unsigned int *)vrna_alloc(sizeof(unsigned int) * fc->n_seq);
+    if (use_comparative_sc_fallback(fc)) {
+      h->tt      = vrna_alloc(sizeof(unsigned int) * fc->n_seq);
+      h->tt_size = fc->n_seq;
+      h->owns_tt = 1;
+    } else {
+      h->tt      = scratch->int_tt;
+      h->tt_size = scratch->int_tt_size;
+    }
 
     for (unsigned int s = 0; s < fc->n_seq; s++)
       h->tt[s] = vrna_get_ptype_md(S[s][i], S[s][j], md);
   } else {
     h->tt = NULL;
   }
-
-  return h;
 }
 
 
@@ -149,8 +440,11 @@ PRIVATE void
 free_intloop_helpers(helper_data_t *h)
 {
   free_sc_int(&(h->sc_wrapper));
-  free(h->tt);
-  free(h);
+  if (h->owns_tt)
+    free(h->tt);
+  h->tt        = NULL;
+  h->tt_size   = 0;
+  h->owns_tt   = 0;
 }
 
 
@@ -470,6 +764,189 @@ mfe_bulges(vrna_fold_compound_t *fc,
 
 
 PRIVATE int
+mfe_internal_loop_single_fast(vrna_fold_compound_t  *fc,
+                              unsigned int          i,
+                              unsigned int          j)
+{
+  char          *ptype;
+  short         *S;
+  int           *idx, *rtype, *c, kl, e, eee;
+  unsigned int  *hc_up, n, ij, k, l, last_k, first_l, u1, u2, type, type2,
+                noGUclosure, hc_decompose;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+  vrna_hc_t     *hc;
+
+  n             = fc->length;
+  idx           = fc->jindx;
+  ij            = idx[j] + i;
+  hc            = fc->hc;
+  hc_up         = hc->up_int;
+  ptype         = fc->ptype;
+  S             = fc->sequence_encoding;
+  c             = fc->matrices->c;
+  P             = fc->params;
+  md            = &(P->model_details);
+  rtype         = &(md->rtype[0]);
+  noGUclosure   = md->noGUclosure;
+  hc_decompose  = hc->mx[n * i + j];
+  e             = INF;
+
+  if (!(hc_decompose & VRNA_CONSTRAINT_CONTEXT_INT_LOOP))
+    return INF;
+
+  type = ptype_fast(ptype, ij);
+
+  /* stacks */
+  k = i + 1;
+  l = j - 1;
+  if ((k < l) && hc_int_linear_fast(hc, n, i, j, k, l)) {
+    kl  = idx[l] + k;
+      eee = c[kl];
+      if (eee != INF) {
+        type2 = rtype[ptype_fast(ptype, kl)];
+        eee  += mfe_E_internal_single_fast(0,
+                                           0,
+                                           type,
+                                           type2,
+                                           S[i + 1],
+                                           S[j - 1],
+                                           S[i],
+                                           S[j],
+                                           P);
+        e     = MIN2(e, eee);
+      }
+  }
+
+  /* bulges */
+  if (!((noGUclosure) && ((type == 3) || (type == 4)))) {
+    l = j - 1;
+    if (l > i + 2) {
+      last_k = l - 1;
+
+      if (last_k > i + 1 + MAXLOOP)
+        last_k = i + 1 + MAXLOOP;
+
+      if (last_k > i + 1 + hc_up[i + 1])
+        last_k = i + 1 + hc_up[i + 1];
+
+      u1 = 1;
+      k  = i + 2;
+      kl = idx[l] + k;
+
+      for (; k <= last_k; k++, u1++, kl++) {
+        if (!hc_int_linear_fast(hc, n, i, j, k, l))
+          continue;
+
+        eee = c[kl];
+        if (eee == INF)
+          continue;
+
+        type2 = rtype[ptype_fast(ptype, kl)];
+        if ((noGUclosure) && ((type2 == 3) || (type2 == 4)))
+          continue;
+
+        eee  += mfe_E_internal_single_fast(u1,
+                                           0,
+                                           type,
+                                           type2,
+                                           S[i + 1],
+                                           S[j - 1],
+                                           S[k - 1],
+                                           S[l + 1],
+                                           P);
+        e     = MIN2(e, eee);
+      }
+    }
+
+    k = i + 1;
+    if (k + 2 < j) {
+      first_l = k + 1;
+      if (first_l + MAXLOOP + 1 < j)
+        first_l = j - 1 - MAXLOOP;
+
+      u2 = 1;
+      for (l = j - 2; l >= first_l; l--, u2++) {
+        if (u2 > hc_up[l + 1])
+          break;
+
+        kl = idx[l] + k;
+        if (!hc_int_linear_fast(hc, n, i, j, k, l))
+          continue;
+
+        eee = c[kl];
+        if (eee == INF)
+          continue;
+
+        type2 = rtype[ptype_fast(ptype, kl)];
+        if ((noGUclosure) && ((type2 == 3) || (type2 == 4)))
+          continue;
+
+        eee  += mfe_E_internal_single_fast(0,
+                                           u2,
+                                           type,
+                                           type2,
+                                           S[i + 1],
+                                           S[j - 1],
+                                           S[k - 1],
+                                           S[l + 1],
+                                           P);
+        e     = MIN2(e, eee);
+      }
+    }
+
+    /* all other internal loops */
+    first_l = i + 3;
+    if (first_l + MAXLOOP + 1 < j)
+      first_l = j - 1 - MAXLOOP;
+
+    u2 = 1;
+    for (l = j - 2; l >= first_l; l--, u2++) {
+      if (u2 > hc_up[l + 1])
+        break;
+
+      last_k = l - 1;
+      if (last_k + u2 > i + 1 + MAXLOOP)
+        last_k = i + 1 + MAXLOOP - u2;
+
+      if (last_k > i + 1 + hc_up[i + 1])
+        last_k = i + 1 + hc_up[i + 1];
+
+      u1 = 1;
+      k  = i + 2;
+      kl = idx[l] + k;
+
+      for (; k <= last_k; k++, u1++, kl++) {
+        if (!hc_int_linear_fast(hc, n, i, j, k, l))
+          continue;
+
+        eee = c[kl];
+        if (eee == INF)
+          continue;
+
+        type2 = rtype[ptype_fast(ptype, kl)];
+        if ((noGUclosure) && ((type2 == 3) || (type2 == 4)))
+          continue;
+
+        eee  += mfe_E_internal_single_fast(u1,
+                                           u2,
+                                           type,
+                                           type2,
+                                           S[i + 1],
+                                           S[j - 1],
+                                           S[k - 1],
+                                           S[l + 1],
+                                           P);
+        e     = MIN2(e, eee);
+      }
+    }
+  }
+
+  return e;
+}
+
+
+PRIVATE int
 mfe_internal_loop(vrna_fold_compound_t  *fc,
                   unsigned int          i,
                   unsigned int          j)
@@ -485,9 +962,9 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
   vrna_md_t     *md;
   vrna_ud_t     *domains_up;
   vrna_hc_t     *hc;
-  helper_data_t *helpers;
-
-  helpers = get_intloop_helpers(fc, i, j);
+  helper_data_t helpers = {
+    0
+  };
 
   e = INF;
 
@@ -518,6 +995,8 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
   with_ud     = ((domains_up) && (domains_up->energy_cb)) ? 1 : 0;
   with_gquad  = md->gquad;
 
+  prepare_intloop_helpers(&helpers, fc, i, j);
+
   hc_decompose = (sliding_window) ? hc_mx_local[i][j - i] : hc_mx[n * i + j];
 
   if (hc_decompose & VRNA_CONSTRAINT_CONTEXT_INT_LOOP) {
@@ -532,9 +1011,9 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
 
     noclose = ((noGUclosure) && (type == 3 || type == 4)) ? 1 : 0;
 
-    e = MIN2(e, mfe_stacks(fc, i, j, helpers));
+    e = MIN2(e, mfe_stacks(fc, i, j, &helpers));
 
-    e = MIN2(e, mfe_bulges(fc, i, j, helpers));
+    e = MIN2(e, mfe_bulges(fc, i, j, &helpers));
 
     if (!noclose) {
       /* only proceed if the enclosing pair is allowed */
@@ -596,7 +1075,7 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
                     type2     = vrna_get_ptype_md(SS[s][l], SS[s][k], md);
                     eee       += vrna_E_internal(u1_local,
                                                  u2_local,
-                                                 helpers->tt[s],
+                                                 helpers.tt[s],
                                                  type2,
                                                  S3[s][i],
                                                  S5[s][j],
@@ -608,8 +1087,8 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
                   break;
               }
 
-              if (helpers->sc_wrapper.pair)
-                eee += helpers->sc_wrapper.pair(i, j, k, l, &(helpers->sc_wrapper));
+              if (helpers.sc_wrapper.pair)
+                eee += helpers.sc_wrapper.pair(i, j, k, l, &(helpers.sc_wrapper));
 
               e = MIN2(e, eee);
 
@@ -642,7 +1121,7 @@ mfe_internal_loop(vrna_fold_compound_t  *fc,
     }
   }
 
-  free_intloop_helpers(helpers);
+  free_intloop_helpers(&helpers);
 
   return e;
 }
@@ -662,6 +1141,7 @@ mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
   vrna_md_t             *md;
   vrna_param_t          *P;
   vrna_hc_t             *hc;
+  vrna_mfe_scratch_t    *scratch;
 
   n     = fc->length;
   n_seq = (fc->type == VRNA_FC_TYPE_SINGLE) ? 1 : fc->n_seq;
@@ -674,6 +1154,7 @@ mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
   P     = fc->params;
   md    = &(P->model_details);
   tt    = NULL;
+  scratch = (vrna_mfe_scratch_t *)fc->matrices->aux_mfe;
 
   e = INF;
 
@@ -681,7 +1162,10 @@ mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
   if (hc_mx[n * i + j] & (VRNA_CONSTRAINT_CONTEXT_INT_LOOP | VRNA_CONSTRAINT_CONTEXT_INT_LOOP_ENC)) {
     /* prepare necessary variables */
     if (fc->type == VRNA_FC_TYPE_COMPARATIVE) {
-      tt = (unsigned int *)vrna_alloc(sizeof(unsigned int) * n_seq);
+      if (use_comparative_sc_fallback(fc))
+        tt = vrna_alloc(sizeof(unsigned int) * n_seq);
+      else
+        tt = scratch->int_ext_tt;
 
       for (s = 0; s < n_seq; s++)
         tt[s] = vrna_get_ptype_md(SS[s][j], SS[s][i], md);
@@ -727,7 +1211,9 @@ mfe_internal_loop_ext(vrna_fold_compound_t  *fc,
     }
   }
 
-  free(tt);
+  if ((fc->type == VRNA_FC_TYPE_COMPARATIVE) &&
+      use_comparative_sc_fallback(fc))
+    free(tt);
 
   return e;
 }

@@ -7,6 +7,50 @@ Below, you'll find a list of notable changes for each version of the ViennaRNA P
 
 ### [Unreleased](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.2...HEAD)
 
+#### Programs
+  * Improve exact-runtime performance of `RNAfold`, `RNAcofold`, and `RNAsubopt` without changing user-visible predictions by specializing the hottest MFE paths, reducing callback dispatch, and reusing temporary storage instead of repeatedly allocating it
+  * Reduce `RNAcofold` overhead in the common exact dimer path by simplifying multistrand helper usage and removing redundant work in dimer-specific MFE handling
+  * Improve throughput of `RNAup`, `RNAplex`, `RNAduplex`, `RNAsampling`, `RNAheat`, and `findpath` workloads by removing avoidable allocator churn and reusing helper buffers across repeated computations
+  * Add performance build guidance to the documentation for `-O3`, optional LTO, and optional PGO workflows that preserve exactness
+
+#### Library
+  * API: Add reusable MFE scratch infrastructure so exact common-case folding paths can avoid heap allocations after `vrna_fold_compound_prepare()`
+  * API: Refactor exact MFE recurrences in `mfe.c`, `mfe_internal.c`, `mfe_exterior.c`, and `mfe_multibranch.c` to favor common-case fast paths, direct hard-constraint checks, and reusable helper state while preserving exact output
+  * API: Add internal MFE profiling support to measure fill, pair decomposition, internal, multibranch, exterior, and backtracking phases
+  * API: Add reusable PF scratch infrastructure and PF profiling hooks to prepare helper objects earlier, reuse temporary arrays, and make hot-path allocation tracking possible for exact partition-function workloads
+  * API: Rework `part_func_up` / `RNAup` helper storage to use contiguous reusable slabs, reducing repeated allocation cost in exact accessibility/interactions computations
+  * API: Reduce exact runtime overhead in `duplex.c`, `plex.c`, `sampling/boltzmann_sampling.c`, and `landscape/findpath.c` by reusing internal scan/state buffers where the previous code rebuilt them on each call
+  * API: Improve `heat_capacity.c` by trimming repeated fold-compound setup and result-buffer growth that did not contribute to the thermodynamic calculation itself
+  * API: Extend explicit SIMD support with an AVX2/FMA implementation for the exact integer `vrna_fun_zip_add_min()` helper and add stricter runtime CPU capability checks, including OS-state validation for AVX-family dispatch
+  * API: Keep ARM NEON, SSE4.1, and AVX-512 exact helper dispatch in the same framework and report compiled SIMD slices explicitly at configure time
+  * API: Fix comparative probing/soft-constraint helper handling uncovered by the new perf and regression work, including safer comparative wrapper initialization and more conservative fallback behavior in sensitive paths
+
+#### SWIG / Python Interface
+  * SWIG: Keep the Python 3 wrapper build working with the refactored library linkage and generated-interface paths needed by the current build tree
+  * SWIG: Preserve the historical installed package layout under `site-packages/RNA/`, including installation of `RNA/RNA.py`, `RNA/__init__.py`, cached bytecode, and removal of `_RNA.la` during install
+  * SWIG: Add validation tooling to compare the historical Python install contract against the current tree so future build changes do not silently alter the installed module layout
+
+#### Package
+  * AUTOCONF: Harden configure-time detection for MPFR by requiring a successful link test rather than only a compile test, which avoids enabling unsupported host/library combinations
+  * AUTOCONF: Skip optional manual-generation steps cleanly when `makeinfo`, `help2man`, or related documentation tools are missing or unusable instead of failing late in `make`
+  * AUTOCONF: Disable the Perl interface automatically when Perl core development headers are unavailable, preventing broken default builds on systems that ship only the runtime
+  * AUTOCONF: Extend SIMD feature detection to record which ISA-specific slices are actually compiled so architecture-specific perf gates can verify that the intended dispatch path is present
+  * BUILD: Improve top-level and `/src` build recursion behavior so normal `configure && make` flows are not hijacked by the `/src` helper wrapper during recursive builds
+  * BUILD: Refresh generated autotools helper files and bundled config scripts as part of the build-system updates
+  * BUILD: Align Python install-pipeline metadata with the historical package install contract while keeping the current Python build functional
+
+#### Tests / Benchmarks
+  * TESTS: Add a broad set of exact-runtime benchmark harnesses for RNAfold, RNAcofold, RNAalifold, RNAsubopt, local/window folding, duplex/plex, sampling, `findpath`, `part_func_up`, `2Dfold`, `2Dpfold`, inverse folding, and heat-capacity workloads
+  * TESTS: Add Python-side old-versus-new exactness/performance comparisons for `RNA.fold()`, `RNA.cofold()`, `RNA.subopt()`, and `RNAup`
+  * TESTS: Add C-API and CLI comparison harnesses plus a combined exactness/performance gate that can be reused on architecture-specific hosts
+  * TESTS: Add bootstrap confidence intervals and significance-threshold checks to the comparison tooling so performance claims can be screened for statistical robustness
+  * TESTS: Add CPU-dispatch probing to the C-API comparison worker so x86_64 AVX2 hosts can assert that the intended accelerated path is both compiled and active at runtime
+  * TESTS: Improve benchmark data handling, CSV generation, and test environment setup so build-tree binaries and wrappers are exercised more reliably during validation
+
+#### Documentation
+  * DOC: Add performance-build notes to `README.md`
+  * DOC: Expand the changelog and validation tooling around the current exact-runtime optimization campaign so the reasons for the refactor and benchmark additions are recorded in-tree
+
 
 ### [Version 2.7.2](https://github.com/ViennaRNA/ViennaRNA/compare/v2.7.1...v2.7.2)
 

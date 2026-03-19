@@ -68,6 +68,7 @@ struct vrna_mx_mfe_s {
   const vrna_mx_type_e  type;     /**< Type of the DP matrices */
   unsigned int          length;   /**<  @brief  Length of the sequence, therefore an indicator of the size of the DP matrices */
   unsigned int          strands;  /**< Number of strands */
+  void                  *aux_mfe; /**<  @brief  Internal reusable MFE scratch data */
   /**
    *  @}
    */
@@ -230,6 +231,7 @@ struct vrna_mx_pf_s {
    */
   const vrna_mx_type_e  type;       /**< Type of the DP matrices */
   unsigned int          length;     /**< Size of the DP matrices (i.e. sequence length) */
+  void                  *aux_pf;    /**<  @brief  Internal reusable PF scratch data */
   FLT_OR_DBL            *scale;     /**< Boltzmann factor scaling */
   FLT_OR_DBL            *expMLbase; /**< Boltzmann factors for unpaired bases in multibranch loop */
 

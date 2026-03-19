@@ -40,8 +40,26 @@ AC_DEFUN([RNA_CHECK_SRC_BUILDERS], [
 
     AC_ARG_VAR([HELP2MAN], [the 'help2man' script to generate man pages from command line options of our executable programs])
     AC_PATH_PROG([HELP2MAN], [help2man], [no])
+    if test "x$HELP2MAN" != "xno"
+    then
+        AC_MSG_CHECKING([whether help2man is runnable])
+        if "$HELP2MAN" --version >/dev/null 2>&1
+        then
+            AC_MSG_RESULT([yes])
+        else
+            AC_MSG_RESULT([no])
+            AC_MSG_WARN([help2man is present but not runnable; disabling manpage generation])
+            HELP2MAN=no
+        fi
+    fi
     AC_SUBST([HELP2MAN])
     AM_CONDITIONAL(VRNA_AM_SWITCH_BUILD_MANPAGES, test "x$HELP2MAN" != "xno" && test "x$GENGETOPT" != "xno")
+    AS_IF([test "x$HELP2MAN" != "xno" && test "x$GENGETOPT" != "xno" && test "x$MAKEINFO_BIN" != "xno"], [
+        MAN_SUBDIR="man"
+    ], [
+        MAN_SUBDIR=""
+    ])
+    AC_SUBST([MAN_SUBDIR])
 ])
 
 

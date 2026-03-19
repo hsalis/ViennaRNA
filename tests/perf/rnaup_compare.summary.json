@@ -1,0 +1,8 @@
+{
+  "cases": 30,
+  "differences": 0,
+  "matches": 30,
+  "runtime_ratio_new_over_old": 0.9272887805664537,
+  "total_new_wall_ns": 5499013876,
+  "total_old_wall_ns": 5930206416
+}

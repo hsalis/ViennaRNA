@@ -1,4 +1,4 @@
-SUBDIRS = ViennaRNA bin Utils @CLUSTER_DIR@
+SUBDIRS = ViennaRNA bin Utils @CLUSTER_DIR@ ../interfaces/Python
 
 EXTRA_DIST = \
   @LIBSVM_DIR@ \

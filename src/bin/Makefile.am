@@ -4,7 +4,7 @@ include $(top_srcdir)/silent_rules.mk
 
 AM_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS)
 AM_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS)
-AM_CPPFLAGS = $(RNA_CPPFLAGS) -I$(top_srcdir)/src
+AM_CPPFLAGS = $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src
 AM_LDFLAGS = $(RNA_LDFLAGS) $(PTHREAD_LIBS)
 
 if VRNA_AM_SWITCH_STATIC_EXECUTABLES
@@ -41,7 +41,7 @@ bin_PROGRAMS = \
 
 LDADD = \
         libhelpers.la \
-        $(top_builddir)/src/ViennaRNA/libRNA_conv.la
+        $(top_builddir)/src/ViennaRNA/libRNA.la
 
 if VRNA_AM_SWITCH_MPFR
 LDADD += $(MPFR_LIBS)
@@ -65,9 +65,7 @@ endif
 RNAmultifold_LDADD = $(LDADD)
 RNAmultifold_LDADD += -lstdc++
 
-RNAfold_LDADD = \
-    $(top_builddir)/src/ViennaRNA/libRNA_special_const.la \
-    $(LDADD)
+RNAfold_LDADD = $(LDADD)
 
 GENGETOPT_CMDL = \
         RNAfold_cmdl.c RNAfold_cmdl.h \

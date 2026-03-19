@@ -25,6 +25,7 @@
 #include "ViennaRNA/structured_domains.h"
 #include "ViennaRNA/unstructured_domains.h"
 #include "ViennaRNA/utils/higher_order_functions.h"
+#include "ViennaRNA/intern/mfe_profile.h"
 
 #include "ViennaRNA/intern/grammar_dat.h"
 
@@ -41,6 +42,7 @@
 struct vrna_mx_mfe_aux_ml_s {
   unsigned int  n;
   int           *Fmi;
+  int           *Fmi_tmp;
   int           *DMLi;
   int           *DMLi1;
   int           *DMLi2;
@@ -77,6 +79,13 @@ E_mb_loop_fast(vrna_fold_compound_t         *fc,
                unsigned int                 i,
                unsigned int                 j,
                struct vrna_mx_mfe_aux_ml_s  *helpers);
+
+
+PRIVATE int
+E_mb_loop_fast_common(vrna_fold_compound_t         *fc,
+                      unsigned int                 i,
+                      unsigned int                 j,
+                      struct vrna_mx_mfe_aux_ml_s  *helpers);
 
 
 PRIVATE int
@@ -125,6 +134,31 @@ ml_pair53(vrna_fold_compound_t  *fc,
           struct sc_mb_dat      *sc_wrapper);
 
 
+PRIVATE INLINE unsigned char
+use_multibranch_single_fast_path(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE unsigned char
+use_multibranch_soft_constraints(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE unsigned int
+ptype_fast_mb(vrna_md_t    *md,
+              short        *S2,
+              unsigned int i,
+              unsigned int j);
+
+
+PRIVATE INLINE unsigned char
+hc_mb_linear_fast(vrna_hc_t      *hc,
+                  unsigned int   n,
+                  unsigned int   i,
+                  unsigned int   j,
+                  unsigned int   k,
+                  unsigned int   l,
+                  unsigned char  d);
+
+
 /*
  #################################
  # BEGIN OF FUNCTION DEFINITIONS #
@@ -160,11 +194,23 @@ vrna_mfe_multibranch_loop_fast(vrna_fold_compound_t         *fc,
                                struct vrna_mx_mfe_aux_ml_s  *helpers)
 {
   if ((fc) &&
-      (helpers))
-    return E_mb_loop_fast(fc,
-                          i,
-                          j,
-                          helpers);
+      (helpers)) {
+    uint64_t t0 = 0;
+    int      ret;
+
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    ret = E_mb_loop_fast(fc,
+                         i,
+                         j,
+                         helpers);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_multibranch(vrna_mfe_profile_now() - t0);
+
+    return ret;
+  }
 
   return INF;
 }
@@ -177,11 +223,23 @@ vrna_mfe_multibranch_stems_fast(vrna_fold_compound_t        *fc,
                                 struct vrna_mx_mfe_aux_ml_s *helpers)
 {
   if ((fc) &&
-      (helpers))
-    return E_ml_stems_fast(fc,
-                           i,
-                           j,
-                           helpers);
+      (helpers)) {
+    uint64_t t0 = 0;
+    int      ret;
+
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    ret = E_ml_stems_fast(fc,
+                          i,
+                          j,
+                          helpers);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_multibranch(vrna_mfe_profile_now() - t0);
+
+    return ret;
+  }
 
   return INF;
 }
@@ -194,8 +252,20 @@ vrna_mfe_multibranch_m2_fast(vrna_fold_compound_t         *fc,
                              struct vrna_mx_mfe_aux_ml_s  *helpers)
 {
   if ((fc) &&
-      (helpers))
-    return mfe_multibranch_m2_fast(fc, i, j, helpers);
+      (helpers)) {
+    uint64_t t0 = 0;
+    int      ret;
+
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    ret = mfe_multibranch_m2_fast(fc, i, j, helpers);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_multibranch(vrna_mfe_profile_now() - t0);
+
+    return ret;
+  }
 
   return INF;
 }
@@ -206,8 +276,20 @@ vrna_mfe_multibranch_loop_stack(vrna_fold_compound_t  *fc,
                                 unsigned int          i,
                                 unsigned int          j)
 {
-  if (fc)
-    return E_mb_loop_stack(fc, i, j);
+  if (fc) {
+    uint64_t t0 = 0;
+    int      ret;
+
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    ret = E_mb_loop_stack(fc, i, j);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_multibranch(vrna_mfe_profile_now() - t0);
+
+    return ret;
+  }
 
   return INF;
 }
@@ -225,9 +307,17 @@ vrna_mfe_multibranch_m1(vrna_fold_compound_t  *fc,
   if ((fc) &&
       (fc->matrices) &&
       (fc->matrices->fM1)) {
-    struct sc_mb_dat      sc_wrapper;
+    uint64_t              t0 = 0;
+    struct sc_mb_dat      sc_wrapper = {
+      0
+    };
+    unsigned char         use_sc = use_multibranch_soft_constraints(fc);
 
-    init_sc_mb(fc, &sc_wrapper);
+    if (vrna_mfe_profile_enabled())
+      t0 = vrna_mfe_profile_now();
+
+    if (use_sc)
+      init_sc_mb(fc, &sc_wrapper);
 
     e = extend_fm_3p(i, j, fc->matrices->fM1, fc, &sc_wrapper);
 
@@ -240,7 +330,11 @@ vrna_mfe_multibranch_m1(vrna_fold_compound_t  *fc,
       }
     }
 
-    free_sc_mb(&sc_wrapper);
+    if (use_sc)
+      free_sc_mb(&sc_wrapper);
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_add_multibranch(vrna_mfe_profile_now() - t0);
   }
 
   return e;
@@ -261,6 +355,7 @@ get_aux_arrays(unsigned int length)
   aux         = (struct vrna_mx_mfe_aux_ml_s *)vrna_alloc(sizeof(struct vrna_mx_mfe_aux_ml_s));
   aux->n      = length;
   aux->Fmi    = (int *)vrna_alloc(sizeof(int) * (length + 1));  /* holds row i of fML (avoids jumps in memory)  */
+  aux->Fmi_tmp = (int *)vrna_alloc(sizeof(int) * (length + 2)); /* reusable scratch for constrained decompositions */
   aux->DMLi   = (int *)vrna_alloc(sizeof(int) * (length + 1));  /* DMLi[j] holds  MIN(fML[i,k]+fML[k+1,j])      */
   aux->DMLi1  = (int *)vrna_alloc(sizeof(int) * (length + 1));  /*                MIN(fML[i+1,k]+fML[k+1,j])    */
   aux->DMLi2  = (int *)vrna_alloc(sizeof(int) * (length + 1));  /*                MIN(fML[i+2,k]+fML[k+1,j])    */
@@ -293,10 +388,160 @@ PRIVATE void
 free_aux_arrays(struct vrna_mx_mfe_aux_ml_s *aux)
 {
   free(aux->Fmi);
+  free(aux->Fmi_tmp);
   free(aux->DMLi);
   free(aux->DMLi1);
   free(aux->DMLi2);
   free(aux);
+}
+
+
+PRIVATE INLINE unsigned char
+use_multibranch_single_fast_path(vrna_fold_compound_t *fc)
+{
+  vrna_md_t *md;
+
+  if ((!fc) ||
+      (fc->type != VRNA_FC_TYPE_SINGLE) ||
+      (fc->strands != 1) ||
+      (!fc->params) ||
+      (!fc->hc) ||
+      (!fc->matrices) ||
+      (fc->hc->type == VRNA_HC_WINDOW) ||
+      (fc->domains_up) ||
+      (fc->aux_grammar))
+    return 0;
+
+  md = &(fc->params->model_details);
+
+  if ((md->circ) ||
+      (md->gquad) ||
+      (fc->hc->f))
+    return 0;
+
+  return 1;
+}
+
+
+PRIVATE INLINE unsigned char
+use_multibranch_soft_constraints(vrna_fold_compound_t *fc)
+{
+  unsigned int  s;
+  vrna_sc_t     *sc, **scs;
+
+  if (!fc)
+    return 0;
+
+  switch (fc->type) {
+    case VRNA_FC_TYPE_SINGLE:
+      sc = fc->sc;
+      if (!sc)
+        return 0;
+
+      return (sc->energy_up ||
+              sc->energy_bp ||
+              sc->energy_bp_local ||
+              sc->energy_stack ||
+              sc->f ||
+              sc->bt ||
+              sc->exp_f) ? 1 : 0;
+
+    case VRNA_FC_TYPE_COMPARATIVE:
+      scs = fc->scs;
+      if (!scs)
+        return 0;
+
+      for (s = 0; s < fc->n_seq; s++) {
+        sc = scs[s];
+        if (sc &&
+            (sc->energy_up ||
+             sc->energy_bp ||
+             sc->energy_bp_local ||
+             sc->energy_stack ||
+             sc->f ||
+             sc->bt ||
+             sc->exp_f))
+          return 1;
+      }
+      break;
+  }
+
+  return 0;
+}
+
+
+PRIVATE INLINE unsigned int
+ptype_fast_mb(vrna_md_t    *md,
+              short        *S2,
+              unsigned int i,
+              unsigned int j)
+{
+  unsigned int tt = (unsigned int)md->pair[S2[j]][S2[i]];
+
+  return (tt == 0) ? 7U : tt;
+}
+
+
+PRIVATE INLINE unsigned char
+hc_mb_linear_fast(vrna_hc_t      *hc,
+                  unsigned int   n,
+                  unsigned int   i,
+                  unsigned int   j,
+                  unsigned int   k,
+                  unsigned int   l,
+                  unsigned char  d)
+{
+  unsigned int di, dj, u;
+
+  di = k - i;
+  dj = j - l;
+
+  switch (d) {
+    case VRNA_DECOMP_ML_ML_ML:
+      u = l - k - 1;
+      return ((u == 0) || (hc->up_ml[k + 1] >= u)) ? 1 : 0;
+
+    case VRNA_DECOMP_ML_ML:
+      if ((di != 0) && (hc->up_ml[i] < di))
+        return 0;
+
+      if ((dj != 0) && (hc->up_ml[l + 1] < dj))
+        return 0;
+
+      return 1;
+
+    case VRNA_DECOMP_ML_STEM:
+      if (!(hc->mx[n * k + l] & VRNA_CONSTRAINT_CONTEXT_MB_LOOP_ENC))
+        return 0;
+
+      if ((di != 0) && (hc->up_ml[i] < di))
+        return 0;
+
+      if ((dj != 0) && (hc->up_ml[l + 1] < dj))
+        return 0;
+
+      return 1;
+
+    case VRNA_DECOMP_PAIR_ML:
+      if (!(hc->mx[n * i + j] & VRNA_CONSTRAINT_CONTEXT_MB_LOOP))
+        return 0;
+
+      di--;
+      dj--;
+
+      if ((di != 0) && (hc->up_ml[i + 1] < di))
+        return 0;
+
+      if ((dj != 0) && (hc->up_ml[l + 1] < dj))
+        return 0;
+
+      return 1;
+
+    case VRNA_DECOMP_ML_COAXIAL:
+      return (hc->mx[n * k + l] & VRNA_CONSTRAINT_CONTEXT_MB_LOOP_ENC) ? 1 : 0;
+  }
+
+  return 0;
 }
 
 
@@ -354,6 +599,170 @@ ml_pair_d0(vrna_fold_compound_t *fc,
   }
 
   return e;
+}
+
+
+PRIVATE INLINE int
+ml_pair_d0_fast_common(vrna_fold_compound_t *fc,
+                       unsigned int         i,
+                       unsigned int         j,
+                       int                  *dmli1)
+{
+  short         *S2;
+  unsigned int  tt, n;
+  int           e;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+
+  n = fc->length;
+  if (!hc_mb_linear_fast(fc->hc, n, i, j, i + 1, j - 1, VRNA_DECOMP_PAIR_ML))
+    return INF;
+
+  e = dmli1[j - 1];
+  if (e == INF)
+    return INF;
+
+  P   = fc->params;
+  md  = &(P->model_details);
+  S2  = fc->sequence_encoding2;
+  tt  = ptype_fast_mb(md, S2, i, j);
+
+  if (md->noGUclosure && ((tt == 3) || (tt == 4)))
+    return INF;
+
+  return e + vrna_E_multibranch_stem(tt, -1, -1, P) + P->MLclosing;
+}
+
+
+PRIVATE INLINE int
+ml_pair_d2_fast_common(vrna_fold_compound_t *fc,
+                       unsigned int         i,
+                       unsigned int         j,
+                       int                  *dmli1)
+{
+  short         *S, *S2;
+  unsigned int  tt, n;
+  int           e;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+
+  n = fc->length;
+  if (!hc_mb_linear_fast(fc->hc, n, i, j, i + 1, j - 1, VRNA_DECOMP_PAIR_ML))
+    return INF;
+
+  e = dmli1[j - 1];
+  if (e == INF)
+    return INF;
+
+  P   = fc->params;
+  md  = &(P->model_details);
+  S   = fc->sequence_encoding;
+  S2  = fc->sequence_encoding2;
+  tt  = ptype_fast_mb(md, S2, i, j);
+
+  if (md->noGUclosure && ((tt == 3) || (tt == 4)))
+    return INF;
+
+  return e + vrna_E_multibranch_stem(tt, S[j - 1], S[i + 1], P) + P->MLclosing;
+}
+
+
+PRIVATE INLINE int
+ml_pair5_fast_common(vrna_fold_compound_t *fc,
+                     unsigned int         i,
+                     unsigned int         j,
+                     int                  *dmli2)
+{
+  short         *S, *S2;
+  unsigned int  tt, n;
+  int           e;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+
+  n = fc->length;
+  if (!hc_mb_linear_fast(fc->hc, n, i, j, i + 2, j - 1, VRNA_DECOMP_PAIR_ML))
+    return INF;
+
+  e = dmli2[j - 1];
+  if (e == INF)
+    return INF;
+
+  P   = fc->params;
+  md  = &(P->model_details);
+  S   = fc->sequence_encoding;
+  S2  = fc->sequence_encoding2;
+  tt  = ptype_fast_mb(md, S2, i, j);
+
+  if (md->noGUclosure && ((tt == 3) || (tt == 4)))
+    return INF;
+
+  return e + vrna_E_multibranch_stem(tt, -1, S[i + 1], P) + P->MLclosing + P->MLbase;
+}
+
+
+PRIVATE INLINE int
+ml_pair3_fast_common(vrna_fold_compound_t *fc,
+                     unsigned int         i,
+                     unsigned int         j,
+                     int                  *dmli1)
+{
+  short         *S, *S2;
+  unsigned int  tt, n;
+  int           e;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+
+  n = fc->length;
+  if (!hc_mb_linear_fast(fc->hc, n, i, j, i + 1, j - 2, VRNA_DECOMP_PAIR_ML))
+    return INF;
+
+  e = dmli1[j - 2];
+  if (e == INF)
+    return INF;
+
+  P   = fc->params;
+  md  = &(P->model_details);
+  S   = fc->sequence_encoding;
+  S2  = fc->sequence_encoding2;
+  tt  = ptype_fast_mb(md, S2, i, j);
+
+  if (md->noGUclosure && ((tt == 3) || (tt == 4)))
+    return INF;
+
+  return e + vrna_E_multibranch_stem(tt, S[j - 1], -1, P) + P->MLclosing + P->MLbase;
+}
+
+
+PRIVATE INLINE int
+ml_pair53_fast_common(vrna_fold_compound_t *fc,
+                      unsigned int         i,
+                      unsigned int         j,
+                      int                  *dmli2)
+{
+  short         *S, *S2;
+  unsigned int  tt, n;
+  int           e;
+  vrna_param_t  *P;
+  vrna_md_t     *md;
+
+  n = fc->length;
+  if (!hc_mb_linear_fast(fc->hc, n, i, j, i + 2, j - 2, VRNA_DECOMP_PAIR_ML))
+    return INF;
+
+  e = dmli2[j - 2];
+  if (e == INF)
+    return INF;
+
+  P   = fc->params;
+  md  = &(P->model_details);
+  S   = fc->sequence_encoding;
+  S2  = fc->sequence_encoding2;
+  tt  = ptype_fast_mb(md, S2, i, j);
+
+  if (md->noGUclosure && ((tt == 3) || (tt == 4)))
+    return INF;
+
+  return e + vrna_E_multibranch_stem(tt, S[j - 1], S[i + 1], P) + P->MLclosing + 2 * P->MLbase;
 }
 
 
@@ -654,6 +1063,39 @@ ml_pair53(vrna_fold_compound_t  *fc,
 
 
 PRIVATE int
+E_mb_loop_fast_common(vrna_fold_compound_t         *fc,
+                      unsigned int                 i,
+                      unsigned int                 j,
+                      struct vrna_mx_mfe_aux_ml_s  *helpers)
+{
+  unsigned int  dangle_model;
+  int           decomp, *dmli1, *dmli2, en;
+
+  dangle_model  = fc->params->model_details.dangles;
+  dmli1         = helpers->DMLi1;
+  dmli2         = helpers->DMLi2;
+
+  switch (dangle_model) {
+    case 0:
+      return ml_pair_d0_fast_common(fc, i, j, dmli1);
+
+    case 2:
+      return ml_pair_d2_fast_common(fc, i, j, dmli1);
+
+    default:
+      decomp  = ml_pair_d0_fast_common(fc, i, j, dmli1);
+      en      = ml_pair5_fast_common(fc, i, j, dmli2);
+      decomp  = MIN2(decomp, en);
+      en      = ml_pair3_fast_common(fc, i, j, dmli1);
+      decomp  = MIN2(decomp, en);
+      en      = ml_pair53_fast_common(fc, i, j, dmli2);
+      decomp  = MIN2(decomp, en);
+      return decomp;
+  }
+}
+
+
+PRIVATE int
 E_mb_loop_fast(vrna_fold_compound_t         *fc,
                unsigned int                 i,
                unsigned int                 j,
@@ -663,18 +1105,26 @@ E_mb_loop_fast(vrna_fold_compound_t         *fc,
   int                   decomp, *dmli1, *dmli2;
   vrna_param_t          *P;
   vrna_md_t             *md;
-  struct sc_mb_dat      sc_wrapper;
+  struct sc_mb_dat      sc_wrapper = {
+    0
+  };
+  unsigned char         use_sc;
 
   P             = fc->params;
   md            = &(P->model_details);
   dangle_model  = md->dangles;
   dmli1         = helpers->DMLi1;
   dmli2         = helpers->DMLi2;
+  use_sc        = use_multibranch_soft_constraints(fc);
 
   /* init values */
   decomp = INF;
 
-  init_sc_mb(fc, &sc_wrapper);
+  if ((!use_sc) && use_multibranch_single_fast_path(fc))
+    return E_mb_loop_fast_common(fc, i, j, helpers);
+
+  if (use_sc)
+    init_sc_mb(fc, &sc_wrapper);
 
   /* do pointer magic for sliding window implementation */
   if (fc->hc->type == VRNA_HC_WINDOW) {
@@ -700,7 +1150,8 @@ E_mb_loop_fast(vrna_fold_compound_t         *fc,
       break;
   }
 
-  free_sc_mb(&sc_wrapper);
+  if (use_sc)
+    free_sc_mb(&sc_wrapper);
 
   return decomp;
 }
@@ -720,7 +1171,10 @@ E_mb_loop_stack(vrna_fold_compound_t  *fc,
   vrna_md_t             *md;
   vrna_hc_t             *hc;
   vrna_hc_eval_loop_f   evaluate;
-  struct sc_mb_dat      sc_wrapper;
+  struct sc_mb_dat      sc_wrapper = {
+    0
+  };
+  unsigned char         use_sc;
 
   sliding_window = (fc->hc->type == VRNA_HC_WINDOW) ? 1 : 0;
 
@@ -744,8 +1198,10 @@ E_mb_loop_stack(vrna_fold_compound_t  *fc,
 
   hc        = fc->hc;
   evaluate  = hc->eval_mb;
+  use_sc    = use_multibranch_soft_constraints(fc);
 
-  init_sc_mb(fc, &sc_wrapper);
+  if (use_sc)
+    init_sc_mb(fc, &sc_wrapper);
 
   /* prepare type(s) for enclosing pair (i, j) */
   if (fc->type == VRNA_FC_TYPE_COMPARATIVE) {
@@ -881,7 +1337,8 @@ E_mb_loop_stack(vrna_fold_compound_t  *fc,
     e = decomp;
   }
 
-  free_sc_mb(&sc_wrapper);
+  if (use_sc)
+    free_sc_mb(&sc_wrapper);
   free(tt);
 
   return e;
@@ -1148,7 +1605,10 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
   unsigned int      k, *sn, *se, sliding_window;
   int               en, decomp, k1j, *indx, *fm, **fm_local, *fmi, *dmli;
   vrna_hc_t         *hc;
-  struct sc_mb_dat  sc_wrapper;
+  struct sc_mb_dat  sc_wrapper = {
+    0
+  };
+  unsigned char     use_sc;
 
   sliding_window = (fc->hc->type == VRNA_HC_WINDOW) ? 1 : 0;
 
@@ -1161,8 +1621,10 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
   fmi       = helpers->Fmi;
   dmli      = helpers->DMLi;
   decomp    = INF;
+  use_sc    = use_multibranch_soft_constraints(fc);
 
-  init_sc_mb(fc, &sc_wrapper);
+  if (use_sc)
+    init_sc_mb(fc, &sc_wrapper);
 
   /* modular decomposition -------------------------------*/
   if (sliding_window) {
@@ -1174,8 +1636,9 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
   int *fmi_tmp = fmi;
 
   if (hc->f) {
-    fmi_tmp = (int *)vrna_alloc(sizeof(int) * (j - i + 2));
-    fmi_tmp -= i;
+    fmi_tmp = helpers->Fmi_tmp;
+    if (sliding_window)
+      fmi_tmp -= i;
 
     /* copy data */
     for (k = i + 1; k <= j - 2; k++)
@@ -1189,8 +1652,9 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
 
   if (sc_wrapper.decomp_ml) {
     if (fmi_tmp == fmi) {
-      fmi_tmp = (int *)vrna_alloc(sizeof(int) * (j - i + 2));
-      fmi_tmp -= i;
+      fmi_tmp = helpers->Fmi_tmp;
+      if (sliding_window)
+        fmi_tmp -= i;
 
       /* copy data */
       for (k = i + 1; k <= j - 2; k++)
@@ -1247,11 +1711,6 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
 
   /* end modular decomposition -------------------------------*/
 
-  if (fmi_tmp != fmi) {
-    fmi_tmp += i;
-    free(fmi_tmp);
-  }
-
   /* apply auxiliary grammar rule for multibranch loop case */
   if (fc->aux_grammar) {
     for (size_t c = 0; c < vrna_array_size(fc->aux_grammar->m2); c++)
@@ -1259,7 +1718,8 @@ mfe_multibranch_m2_fast(vrna_fold_compound_t        *fc,
         decomp = MIN2(decomp, fc->aux_grammar->m2[c].cb(fc, i, j, fc->aux_grammar->m2[c].data));
   }
 
-  free_sc_mb(&sc_wrapper);
+  if (use_sc)
+    free_sc_mb(&sc_wrapper);
 
   return decomp;               /* store for use in fast ML decompositon */
 }
@@ -1282,7 +1742,10 @@ E_ml_stems_fast(vrna_fold_compound_t        *fc,
   vrna_ud_t             *domains_up;
   vrna_hc_t             *hc;
   vrna_hc_eval_loop_f   evaluate;
-  struct sc_mb_dat      sc_wrapper;
+  struct sc_mb_dat      sc_wrapper = {
+    0
+  };
+  unsigned char         use_sc;
 
   sliding_window = (fc->hc->type == VRNA_HC_WINDOW) ? 1 : 0;
 
@@ -1316,8 +1779,10 @@ E_ml_stems_fast(vrna_fold_compound_t        *fc,
 
   hc            = fc->hc;
   evaluate      = hc->eval_mb;
+  use_sc        = use_multibranch_soft_constraints(fc);
 
-  init_sc_mb(fc, &sc_wrapper);
+  if (use_sc)
+    init_sc_mb(fc, &sc_wrapper);
 
   /*
    *  extension with one unpaired nucleotide at the right (3' site)
@@ -1608,6 +2073,9 @@ E_ml_stems_fast(vrna_fold_compound_t        *fc,
   fmi[j] = e;
 
   free_sc_mb(&sc_wrapper);
+
+  if (use_sc)
+    free_sc_mb(&sc_wrapper);
 
   return e;
 }

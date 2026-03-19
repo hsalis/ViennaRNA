@@ -55,6 +55,16 @@ AC_DEFUN([RNA_ENABLE_SWIG_PERL],[
     if test "x$PERL" = "x"; then
       AC_MSG_ERROR([Perl is required to build.])
       [enable_perl_status="Perl is required to build."]
+    elif test ! -f "$PERL_EXT_INC/EXTERN.h" || test ! -f "$PERL_EXT_INC/perl.h"; then
+      AC_MSG_WARN([Perl core headers are missing from $PERL_EXT_INC; disabling Perl interface])
+      with_perl="no"
+    else
+      AX_PERL_EXT_FLAGS([PERLXS_CFLAGS], [PERLXS_LDFLAGS])
+      AX_PERL_EXT_LINK_CHECK([perl_ext_works])
+      if test "x$perl_ext_works" != "xyes"; then
+        AC_MSG_WARN([Perl development headers or linker flags are unusable; disabling Perl interface])
+        with_perl="no"
+      fi
     fi
   ])
 

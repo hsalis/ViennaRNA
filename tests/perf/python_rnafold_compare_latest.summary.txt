@@ -1,0 +1,14 @@
+new_version: 2.7.2
+old_version: 2.7.2
+seed: 1729
+lengths: 100, 500, 1000
+seqs_per_length: 30
+total_sequences: 90
+total_differences: 0
+
+per_length:
+  100: count=30 diff_count=0 max_abs_energy_delta=0.000000 median_abs_energy_delta=0.000000
+  500: count=30 diff_count=0 max_abs_energy_delta=0.000000 median_abs_energy_delta=0.000000
+  1000: count=30 diff_count=0 max_abs_energy_delta=0.000000 median_abs_energy_delta=0.000000
+
+differences: none

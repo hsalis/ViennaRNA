@@ -22,25 +22,25 @@ if VRNA_AM_SWITCH_HAS_XXD
 
 ## The rule for generating .hex files from .ps
 .ps.hex:
-	$(xxd_verbose)$(XXD) -i < $< > $@ && echo ',0x00' >> $@
+	$(xxd_verbose)$(MKDIR_P) $(dir $@) && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
 
 templates_postscript.h: $(PS_TEMPLATE_FILES_HEX)
 
 .svg.hex:
-	$(xxd_verbose)$(XXD) -i < $< > $@ && echo ',0x00' >> $@
+	$(xxd_verbose)$(MKDIR_P) $(dir $@) && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
 
 templates_svg.h: $(SVG_TEMPLATE_FILES_HEX)
 
 .par.hex:
-	$(xxd_verbose)$(MKDIR_P) misc && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
+	$(xxd_verbose)$(MKDIR_P) $(dir $@) && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
 
 .json.hex:
-	$(xxd_verbose)$(MKDIR_P) misc && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
+	$(xxd_verbose)$(MKDIR_P) $(dir $@) && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
 
 energy_parameter_sets.h: $(PARAMETER_FILES_HEX)
 
 .data.hex:
-	$(xxd_verbose)$(MKDIR_P) misc && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
+	$(xxd_verbose)$(MKDIR_P) $(dir $@) && $(XXD) -i < $< > $@ && echo ',0x00' >> $@
 
 probing_data_priors.h: $(PROBING_DATA_PRIOR_FILES_HEX)
 

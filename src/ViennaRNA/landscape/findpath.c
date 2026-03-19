@@ -76,6 +76,12 @@ struct vrna_path_options_s {
 PRIVATE int                   BP_dist;
 PRIVATE move_t                *path = NULL;
 PRIVATE int                   path_fwd; /* 1: s1->s2, else s2 -> s1 */
+PRIVATE vrna_fold_compound_t  *cached_vc = NULL;
+PRIVATE char                  *cached_s1 = NULL;
+PRIVATE char                  *cached_s2 = NULL;
+PRIVATE int                   cached_width;
+PRIVATE int                   cached_saddle = INT_MAX;
+PRIVATE int                   cached_valid;
 
 
 #ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
@@ -86,7 +92,7 @@ PRIVATE vrna_fold_compound_t  *backward_compat_compound = NULL;
 
 /* NOTE: all variables are assumed to be uninitialized if they are declared as threadprivate
  */
-#pragma omp threadprivate(BP_dist, path, path_fwd, backward_compat_compound)
+#pragma omp threadprivate(BP_dist, path, path_fwd, cached_vc, cached_s1, cached_s2, cached_width, cached_saddle, cached_valid, backward_compat_compound)
 
 #endif
 
@@ -118,6 +124,26 @@ compare_moves_when(const void *A,
 
 PRIVATE void
 free_intermediate(intermediate_t *i);
+
+
+PRIVATE void
+findpath_cache_reset(void);
+
+
+PRIVATE void
+findpath_cache_store(vrna_fold_compound_t *vc,
+                     const char           *s1,
+                     const char           *s2,
+                     int                  width,
+                     int                  saddle);
+
+
+PRIVATE int
+findpath_cache_match(vrna_fold_compound_t *vc,
+                     const char           *s1,
+                     const char           *s2,
+                     int                  width,
+                     int                  maxE);
 
 
 #ifdef TEST_FINDPATH
@@ -196,6 +222,11 @@ vrna_path_findpath_saddle_ub(vrna_fold_compound_t *vc,
   int     dir;
 
   path_fwd  = dir = 0;
+
+  if (findpath_cache_match(vc, s1, s2, width, maxE))
+    return cached_saddle;
+
+  findpath_cache_reset();
   pt1       = vrna_ptable(s1);
   pt2       = vrna_ptable(s2);
 
@@ -233,6 +264,9 @@ vrna_path_findpath_saddle_ub(vrna_fold_compound_t *vc,
   path      = bestpath;
   path_fwd  = dir;
 
+  if (bestpath)
+    findpath_cache_store(vc, s1, s2, width, maxE);
+
   free(pt1);
   free(pt2);
 
@@ -246,17 +280,17 @@ vrna_path_findpath(vrna_fold_compound_t *fc,
                    const char           *s2,
                    int                  width)
 {
-  struct vrna_path_options_s  *opt;
+  struct vrna_path_options_s  opt;
   vrna_path_t                 *path;
 
-  opt   = vrna_path_options_findpath(width, VRNA_PATH_TYPE_DOT_BRACKET);
+  opt.type    = VRNA_PATH_TYPE_DOT_BRACKET;
+  opt.method  = PATH_DIRECT_FINDPATH;
+  opt.width   = width;
   path  = vrna_path_direct_ub(fc,
                               s1,
                               s2,
                               INT_MAX - 1,
-                              opt);
-
-  free(opt);
+                              &opt);
 
   return path;
 }
@@ -269,17 +303,17 @@ vrna_path_findpath_ub(vrna_fold_compound_t  *fc,
                       int                   width,
                       int                   maxE)
 {
-  struct vrna_path_options_s  *opt;
+  struct vrna_path_options_s  opt;
   vrna_path_t                 *path;
 
-  opt   = vrna_path_options_findpath(width, VRNA_PATH_TYPE_DOT_BRACKET);
+  opt.type    = VRNA_PATH_TYPE_DOT_BRACKET;
+  opt.method  = PATH_DIRECT_FINDPATH;
+  opt.width   = width;
   path  = vrna_path_direct_ub(fc,
                               s1,
                               s2,
                               maxE,
-                              opt);
-
-  free(opt);
+                              &opt);
 
   return path;
 }
@@ -423,6 +457,7 @@ findpath_method(vrna_fold_compound_t  *fc,
 
   free(path);
   path = NULL;
+  cached_valid = 0;
 
   return route;
 }
@@ -666,6 +701,56 @@ try_moves(vrna_fold_compound_t  *vc,
 }
 
 
+PRIVATE void
+findpath_cache_reset(void)
+{
+  free(cached_s1);
+  free(cached_s2);
+  cached_s1      = NULL;
+  cached_s2      = NULL;
+  cached_vc      = NULL;
+  cached_width   = 0;
+  cached_saddle  = INT_MAX;
+  cached_valid   = 0;
+}
+
+
+PRIVATE void
+findpath_cache_store(vrna_fold_compound_t *vc,
+                     const char           *s1,
+                     const char           *s2,
+                     int                  width,
+                     int                  saddle)
+{
+  cached_s1      = strdup(s1);
+  cached_s2      = strdup(s2);
+  cached_vc      = vc;
+  cached_width   = width;
+  cached_saddle  = saddle;
+  cached_valid   = (cached_s1 && cached_s2) ? 1 : 0;
+}
+
+
+PRIVATE int
+findpath_cache_match(vrna_fold_compound_t *vc,
+                     const char           *s1,
+                     const char           *s2,
+                     int                  width,
+                     int                  maxE)
+{
+  if ((!path) || (!cached_valid))
+    return 0;
+
+  if ((vc != cached_vc) ||
+      (width != cached_width) ||
+      (cached_saddle >= maxE))
+    return 0;
+
+  return ((strcmp(s1, cached_s1) == 0) &&
+          (strcmp(s2, cached_s2) == 0));
+}
+
+
 PRIVATE int
 find_path_once(vrna_fold_compound_t *vc,
                short                *pt1,
@@ -738,6 +823,7 @@ find_path_once(vrna_fold_compound_t *vc,
       free_intermediate(cc);
     for (u = 0; u < maxl && u < num_next; u++)
       current[u] = next[u];
+    current[u].pt = NULL;
     for (; u < num_next; u++)
       free_intermediate(next + u);
     num_next = 0;

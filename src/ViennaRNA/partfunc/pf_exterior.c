@@ -23,6 +23,8 @@
 #include "ViennaRNA/partfunc/exterior.h"
 
 #include "ViennaRNA/intern/grammar_dat.h"
+#include "ViennaRNA/intern/pf_profile.h"
+#include "ViennaRNA/intern/pf_scratch.h"
 
 #ifdef __GNUC__
 # define INLINE inline
@@ -107,15 +109,26 @@ vrna_exp_E_ext_fast_init(vrna_fold_compound_t *fc)
     turn        = fc->exp_params->model_details.min_loop_size;
     domains_up  = fc->domains_up;
     with_ud     = (domains_up && domains_up->exp_energy_cb);
+    aux_mx      = (fc->exp_matrices && fc->exp_matrices->aux_pf) ?
+                  ((vrna_pf_scratch_t *)fc->exp_matrices->aux_pf)->ext_helpers :
+                  NULL;
 
     init_sc_ext_exp(fc, &sc_wrapper);
 
-    /* allocate memory for helper arrays */
-    aux_mx            = (struct vrna_mx_pf_aux_el_s *)vrna_alloc(sizeof(struct vrna_mx_pf_aux_el_s));
-    aux_mx->qq        = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qq1       = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
-    aux_mx->qqu_size  = 0;
-    aux_mx->qqu       = NULL;
+    if (!aux_mx) {
+      aux_mx            = (struct vrna_mx_pf_aux_el_s *)vrna_alloc(sizeof(struct vrna_mx_pf_aux_el_s));
+      aux_mx->qq        = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qq1       = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      aux_mx->qqu_size  = 0;
+      aux_mx->qqu       = NULL;
+      vrna_pf_profile_count_alloc(3);
+
+      if (fc->exp_matrices && fc->exp_matrices->aux_pf)
+        ((vrna_pf_scratch_t *)fc->exp_matrices->aux_pf)->ext_helpers = aux_mx;
+    }
+
+    memset(aux_mx->qq, 0, sizeof(FLT_OR_DBL) * (n + 2));
+    memset(aux_mx->qq1, 0, sizeof(FLT_OR_DBL) * (n + 2));
 
     /* pre-processing ligand binding production rule(s) and auxiliary memory */
     if (with_ud) {
@@ -124,11 +137,28 @@ vrna_exp_E_ext_fast_init(vrna_fold_compound_t *fc)
         if (ud_max_size < domains_up->uniq_motif_size[u])
           ud_max_size = domains_up->uniq_motif_size[u];
 
-      aux_mx->qqu_size  = ud_max_size;
-      aux_mx->qqu       = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (ud_max_size + 1));
+      if (aux_mx->qqu_size != (int)ud_max_size) {
+        if (aux_mx->qqu) {
+          for (u = 0; u <= (unsigned int)aux_mx->qqu_size; u++)
+            free(aux_mx->qqu[u]);
+
+          free(aux_mx->qqu);
+        }
+
+        aux_mx->qqu_size  = (int)ud_max_size;
+        aux_mx->qqu       = (FLT_OR_DBL **)vrna_alloc(sizeof(FLT_OR_DBL *) * (ud_max_size + 1));
+
+        for (u = 0; u <= ud_max_size; u++)
+          aux_mx->qqu[u] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+
+        vrna_pf_profile_count_alloc(1 + ud_max_size + 1);
+      }
 
       for (u = 0; u <= ud_max_size; u++)
-        aux_mx->qqu[u] = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+        memset(aux_mx->qqu[u], 0, sizeof(FLT_OR_DBL) * (n + 2));
+    } else if (aux_mx->qqu) {
+      for (u = 0; u <= (unsigned int)aux_mx->qqu_size; u++)
+        memset(aux_mx->qqu[u], 0, sizeof(FLT_OR_DBL) * (n + 2));
     }
 
     if (fc->hc->type == VRNA_HC_WINDOW) {
@@ -226,7 +256,12 @@ vrna_exp_E_ext_fast(vrna_fold_compound_t        *fc,
                     int                         j,
                     struct vrna_mx_pf_aux_el_s  *aux_mx)
 {
+  uint64_t q_t0 = 0;
+
   if (fc) {
+    if (vrna_pf_profile_enabled())
+      q_t0 = vrna_pf_profile_now();
+
     if (j < i) {
       int t = j;
       vrna_log_warning(
@@ -252,7 +287,12 @@ vrna_exp_E_ext_fast(vrna_fold_compound_t        *fc,
       return 0.;
     }
 
-    return exp_E_ext_fast(fc, i, j, aux_mx);
+    FLT_OR_DBL q = exp_E_ext_fast(fc, i, j, aux_mx);
+
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_add_exterior(vrna_pf_profile_now() - q_t0);
+
+    return q;
   }
 
   return 0.;

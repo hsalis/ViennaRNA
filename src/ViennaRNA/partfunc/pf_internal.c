@@ -20,6 +20,8 @@
 #include "ViennaRNA/eval/internal.h"
 #include "ViennaRNA/partfunc/gquad.h"
 #include "ViennaRNA/partfunc/internal.h"
+#include "ViennaRNA/intern/pf_profile.h"
+#include "ViennaRNA/intern/pf_scratch.h"
 
 
 #ifdef __GNUC__
@@ -58,11 +60,15 @@ vrna_exp_E_int_loop(vrna_fold_compound_t  *fc,
                     int                   i,
                     int                   j)
 {
+  uint64_t   t0 = 0;
   FLT_OR_DBL q = 0.;
 
   if ((fc) &&
       (i > 0) &&
       (j > 0)) {
+    if (vrna_pf_profile_enabled())
+      t0 = vrna_pf_profile_now();
+
     if (j < i) {
       /* Note: j < i indicates that we want to evaluate exterior int loop (for circular RNAs)! */
       if (fc->hc->type == VRNA_HC_WINDOW) {
@@ -76,6 +82,9 @@ vrna_exp_E_int_loop(vrna_fold_compound_t  *fc,
     } else {
       q = exp_E_int_loop(fc, i, j);
     }
+
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_add_internal(vrna_pf_profile_now() - t0);
   }
 
   return q;
@@ -99,6 +108,7 @@ exp_E_int_loop(vrna_fold_compound_t *fc,
   vrna_md_t             *md;
   vrna_hc_t             *hc;
   vrna_ud_t             *domains_up;
+  vrna_pf_scratch_t     *scratch;
   struct sc_int_exp_dat sc_wrapper;
 
   sliding_window  = (fc->hc->type == VRNA_HC_WINDOW) ? 1 : 0;
@@ -131,6 +141,7 @@ exp_E_int_loop(vrna_fold_compound_t *fc,
   rtype       = &(md->rtype[0]);
   qbt1        = 0.;
   hc          = fc->hc;
+  scratch     = (fc->exp_matrices) ? (vrna_pf_scratch_t *)fc->exp_matrices->aux_pf : NULL;
 
   init_sc_int_exp(fc, &sc_wrapper);
 
@@ -155,9 +166,16 @@ exp_E_int_loop(vrna_fold_compound_t *fc,
     noclose = ((noGUclosure) && (type == 3 || type == 4)) ? 1 : 0;
 
     if (fc->type == VRNA_FC_TYPE_COMPARATIVE) {
-      tt = (unsigned int *)vrna_alloc(sizeof(unsigned int) * n_seq);
+      tt = (scratch && scratch->int_tt) ?
+           scratch->int_tt :
+           (unsigned int *)vrna_alloc(sizeof(unsigned int) * n_seq);
       for (s = 0; s < n_seq; s++)
         tt[s] = vrna_get_ptype_md(SS[s][i], SS[s][j], md);
+
+      if ((scratch) && (tt == scratch->int_tt))
+        ;
+      else
+        vrna_pf_profile_count_alloc(1);
     }
 
     /* handle stacks separately */
@@ -523,7 +541,9 @@ exp_E_int_loop(vrna_fold_compound_t *fc,
       }
     }
 
-    free(tt);
+    if ((tt) &&
+        ((!scratch) || (tt != scratch->int_tt)))
+      free(tt);
   }
 
   free_sc_int_exp(&sc_wrapper);
@@ -548,6 +568,7 @@ exp_E_ext_int_loop(vrna_fold_compound_t *fc,
   vrna_md_t             *md;
   vrna_hc_t             *hc;
   vrna_ud_t             *domains_up;
+  vrna_pf_scratch_t     *scratch;
   struct sc_int_exp_dat sc_wrapper;
 
   n           = fc->length;
@@ -570,6 +591,7 @@ exp_E_ext_int_loop(vrna_fold_compound_t *fc,
   tt          = NULL;
   domains_up  = fc->domains_up;
   with_ud     = ((domains_up) && (domains_up->exp_energy_cb)) ? 1 : 0;
+  scratch     = (fc->exp_matrices) ? (vrna_pf_scratch_t *)fc->exp_matrices->aux_pf : NULL;
 
   q = 0.;
 
@@ -581,10 +603,17 @@ exp_E_ext_int_loop(vrna_fold_compound_t *fc,
     if (fc->type == VRNA_FC_TYPE_SINGLE) {
       type = vrna_get_ptype_md(S2[j], S2[i], md);
     } else {
-      tt = (unsigned int *)vrna_alloc(sizeof(unsigned int) * n_seq);
+      tt = (scratch && scratch->ext_int_tt) ?
+           scratch->ext_int_tt :
+           (unsigned int *)vrna_alloc(sizeof(unsigned int) * n_seq);
 
       for (s = 0; s < n_seq; s++)
         tt[s] = vrna_get_ptype_md(SS[s][j], SS[s][i], md);
+
+      if ((scratch) && (tt == scratch->ext_int_tt))
+        ;
+      else
+        vrna_pf_profile_count_alloc(1);
     }
 
     for (k = j + 1; k < n; k++) {
@@ -693,7 +722,9 @@ exp_E_ext_int_loop(vrna_fold_compound_t *fc,
     }
   }
 
-  free(tt);
+  if ((tt) &&
+      ((!scratch) || (tt != scratch->ext_int_tt)))
+    free(tt);
   free_sc_int_exp(&sc_wrapper);
 
   return q;

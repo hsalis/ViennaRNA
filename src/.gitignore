@@ -1,3 +1,4 @@
 # ignore libsvm directory
 libsvm-*
 dlib-*
+.build/

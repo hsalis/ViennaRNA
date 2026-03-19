@@ -1,0 +1,15 @@
+{
+  "fold": {
+    "task": "fold",
+    "cases": 90,
+    "differences": 0,
+    "old_total_median_ns": 20592764792,
+    "new_total_median_ns": 9617922627,
+    "runtime_ratio": 0.4670534881618435,
+    "runtime_ratio_ci95_low": 0.4647279627284601,
+    "runtime_ratio_ci95_high": 0.4701618337427687,
+    "significance_threshold": 0.95,
+    "speedup_significant": true,
+    "difference_ids": []
+  }
+}

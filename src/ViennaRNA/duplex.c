@@ -56,14 +56,17 @@
  */
 PRIVATE vrna_param_t  *P = NULL;
 PRIVATE int           **c = NULL;     /* energy array, given that i-j pair */
+PRIVATE int           *c_storage = NULL;
 PRIVATE short         *S1 = NULL, *SS1 = NULL, *S2 = NULL, *SS2 = NULL;
 PRIVATE int           n1, n2;         /* sequence lengths */
+PRIVATE size_t        c_rows_alloc = 0;
+PRIVATE size_t        c_cells_alloc = 0;
 
 #ifdef _OPENMP
 
 /* NOTE: all variables are assumed to be uninitialized if they are declared as threadprivate
  */
-#pragma omp threadprivate(P, c, S1, SS1, S2, SS2, n1, n2)
+#pragma omp threadprivate(P, c, c_storage, S1, SS1, S2, SS2, n1, n2, c_rows_alloc, c_cells_alloc)
 
 #endif
 
@@ -106,11 +109,41 @@ covscore(const int  *types,
          int        n_seq);
 
 
+PRIVATE void
+ensure_duplex_matrix(int rows,
+                     int cols);
+
+
 /*
  #################################
  # BEGIN OF FUNCTION DEFINITIONS #
  #################################
  */
+PRIVATE void
+ensure_duplex_matrix(int rows,
+                     int cols)
+{
+  size_t  i, need_rows, need_cells, stride;
+
+  need_rows = (size_t)rows + 1;
+  stride    = (size_t)cols + 1;
+  need_cells = need_rows * stride;
+
+  if (c_rows_alloc < need_rows) {
+    c             = (int **)vrna_realloc(c, sizeof(int *) * need_rows);
+    c_rows_alloc  = need_rows;
+  }
+
+  if (c_cells_alloc < need_cells) {
+    c_storage     = (int *)vrna_realloc(c_storage, sizeof(int) * need_cells);
+    c_cells_alloc = need_cells;
+  }
+
+  for (i = 0; i < need_rows; i++)
+    c[i] = c_storage + (i * stride);
+}
+
+
 PUBLIC duplexT
 duplexfold(const char *s1,
            const char *s2)
@@ -147,9 +180,7 @@ duplexfold_cu(const char  *s1,
     }
   }
 
-  c = (int **)vrna_alloc(sizeof(int *) * (n1 + 1));
-  for (i = 1; i <= n1; i++)
-    c[i] = (int *)vrna_alloc(sizeof(int) * (n2 + 1));
+  ensure_duplex_matrix(n1, n2);
 
   S1  = encode_sequence(s1, 0);
   S2  = encode_sequence(s2, 0);
@@ -201,9 +232,6 @@ duplexfold_cu(const char  *s1,
   mfe.energy    = (float)Emin / 100.;
   mfe.structure = struc;
   if (clean_up) {
-    for (i = 1; i <= n1; i++)
-      free(c[i]);
-    free(c);
     free(S1);
     free(S2);
     free(SS1);
@@ -273,9 +301,6 @@ duplex_subopt(const char  *s1,
     }
   }
   /* free all static globals */
-  for (i = 1; i <= n1; i++)
-    free(c[i]);
-  free(c);
   free(S1);
   free(S2);
   free(SS1);
@@ -450,9 +475,7 @@ aliduplexfold_cu(const char *s1[],
     }
   }
 
-  c = (int **)vrna_alloc(sizeof(int *) * (n1 + 1));
-  for (i = 1; i <= n1; i++)
-    c[i] = (int *)vrna_alloc(sizeof(int) * (n2 + 1));
+  ensure_duplex_matrix(n1, n2);
 
   S1  = (short **)vrna_alloc((n_seq + 1) * sizeof(short *));
   S2  = (short **)vrna_alloc((n_seq + 1) * sizeof(short *));
@@ -543,11 +566,7 @@ aliduplexfold_cu(const char *s1[],
   mfe.j         = j_min;
   mfe.energy    = (float)(Emin / (100. * n_seq));
   mfe.structure = struc;
-  if (clean_up) {
-    for (i = 1; i <= n1; i++)
-      free(c[i]);
-    free(c);
-  }
+  (void)clean_up;
 
   for (s = 0; s < n_seq; s++) {
     free(S1[s]);
@@ -654,9 +673,6 @@ aliduplex_subopt(const char *s1[],
     }
   }
 
-  for (i = 1; i <= n1; i++)
-    free(c[i]);
-  free(c);
   for (s = 0; s < n_seq; s++) {
     free(S1[s]);
     free(S2[s]);

@@ -1,0 +1,9 @@
+{
+  "task": "cofold",
+  "cases": 30,
+  "differences": 0,
+  "old_total_median_ns": 1039766252,
+  "new_total_median_ns": 775834833,
+  "runtime_ratio": 0.746162737545746,
+  "difference_ids": []
+}

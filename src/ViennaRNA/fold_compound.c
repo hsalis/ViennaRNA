@@ -35,6 +35,8 @@
 #include "ViennaRNA/constraints/hard.h"
 #include "ViennaRNA/constraints/soft.h"
 #include "ViennaRNA/partfunc/global.h"
+#include "ViennaRNA/partfunc/exterior.h"
+#include "ViennaRNA/partfunc/multibranch.h"
 #include "ViennaRNA/cofold.h"
 #include "ViennaRNA/mm.h"
 #include "ViennaRNA/sequences/alphabet.h"
@@ -563,6 +565,16 @@ vrna_fold_compound_prepare(vrna_fold_compound_t *fc,
 
   /* Add DP matrices, if not they are not present or do not fit current settings */
   vrna_mx_prepare(fc, options);
+
+  if ((options & VRNA_OPTION_PF) &&
+      (fc->exp_matrices) &&
+      (fc->hc) &&
+      (fc->hc->type != VRNA_HC_WINDOW)) {
+    if (!fc->domains_up || !fc->domains_up->exp_energy_cb)
+      vrna_exp_E_ext_fast_init(fc);
+
+    vrna_exp_E_ml_fast_init(fc);
+  }
 
   /* prepare auxiliary grammar rules data structure, if required */
   ret &= vrna_gr_prepare(fc, options);

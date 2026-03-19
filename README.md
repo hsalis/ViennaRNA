@@ -255,6 +255,42 @@ See also
 for a complete list of all `./configure` options and important environment
 variables.
 
+### Performance-oriented builds
+
+For exact-runtime work on `RNAfold` and the MFE recurrences, prefer a release
+configuration that enables the optimizer but keeps floating-point semantics
+unchanged:
+
+```
+CFLAGS="-O3 -DNDEBUG" ./configure
+make
+```
+
+If your compiler/linker combination supports link-time optimization, enable it
+through the existing configure switch:
+
+```
+CFLAGS="-O3 -DNDEBUG" ./configure --enable-lto
+make
+```
+
+For profile-guided optimization, collect profiles with the dedicated MFE
+benchmark harness and then rebuild using the recorded profile data:
+
+```
+make clean
+CFLAGS="-O3 -fprofile-generate" ./configure --enable-lto
+make
+./tests/perf/rnafold_mfe_bench > rnafold_mfe_profile.csv
+
+make clean
+CFLAGS="-O3 -fprofile-use -fprofile-correction" ./configure --enable-lto
+make
+```
+
+Avoid `-ffast-math` or similar flags for exact MFE benchmarking since they may
+change numerical behavior and invalidate comparisons across builds.
+
 ----
 
 ## Executable Programs

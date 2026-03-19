@@ -37,11 +37,11 @@ nobase_dist_perlmod_DATA = \
 
 RNA_la_CFLAGS = $(RNA_CFLAGS) $(PTHREAD_CFLAGS)
 RNA_la_CXXFLAGS = $(RNA_CXXFLAGS) $(PTHREAD_CFLAGS) -Wno-unused-label -Wno-unused-variable
-RNA_la_CPPFLAGS = -I$(PERL_EXT_INC) $(RNA_CPPFLAGS) -I$(top_srcdir)/src
+RNA_la_CPPFLAGS = -I$(PERL_EXT_INC) $(RNA_CPPFLAGS) -I$(top_builddir)/src -I$(top_srcdir)/src
 
 RNA_la_LIBADD = \
     $(LDADD) \
-    $(top_builddir)/src/ViennaRNA/libRNA_conv.la
+    $(top_builddir)/src/ViennaRNA/libRNA.la
 
 if VRNA_AM_SWITCH_SVM
 RNA_la_LIBADD += -lstdc++
@@ -82,6 +82,8 @@ if HAS_SWIG
 $(SWIG_wrapper) $(PERL_MODULE): $(INTERFACE_FILES)
 	$(swig_verbose)$(SWIG) \
                   -I$(top_srcdir)/src \
+                  -I$(top_builddir)/interfaces \
+                  -I$(top_srcdir)/interfaces \
                   -I$(srcdir) \
                   -I$(builddir) \
                   $(RNA_CPPFLAGS) \

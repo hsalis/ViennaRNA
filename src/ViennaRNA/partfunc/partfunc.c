@@ -38,6 +38,8 @@
 #include "ViennaRNA/partfunc/global.h"
 
 #include "ViennaRNA/intern/grammar_dat.h"
+#include "ViennaRNA/intern/pf_profile.h"
+#include "ViennaRNA/intern/pf_scratch.h"
 
 #include "ViennaRNA/constraints/exterior_sc_pf.inc"
 #include "ViennaRNA/constraints/internal_sc_pf.inc"
@@ -106,6 +108,8 @@ vrna_pf(vrna_fold_compound_t  *fc,
   dG = (FLT_OR_DBL)(INF / 100.);
 
   if (fc) {
+    uint64_t t0;
+
     /* make sure, everything is set up properly to start partition function computations */
     if (!vrna_fold_compound_prepare(fc, VRNA_OPTION_PF)) {
       vrna_log_warning("vrna_pf@part_func.c: Failed to prepare vrna_fold_compound");
@@ -132,6 +136,9 @@ vrna_pf(vrna_fold_compound_t  *fc,
     if (fc->stat_cb)
       fc->stat_cb(fc, VRNA_STATUS_PF_PRE, fc->auxdata);
 
+    if (vrna_pf_profile_enabled())
+      vrna_pf_profile_reset();
+
     /* for now, multi-strand folding is implemented as additional grammar rule */
     if (fc->strands > 1)
       vrna_pf_multifold_prepare(fc);
@@ -152,9 +159,13 @@ vrna_pf(vrna_fold_compound_t  *fc,
       return dG;
     }
 
-    if (md->circ)
+    if (md->circ) {
+      t0 = vrna_pf_profile_enabled() ? vrna_pf_profile_now() : 0;
       /* do post processing step for circular RNAs */
       postprocess_circular(fc);
+      if (vrna_pf_profile_enabled())
+        vrna_pf_profile_add_circular(vrna_pf_profile_now() - t0);
+    }
 
     /* call user-defined grammar post-condition callback function */
     if (fc->aux_grammar) {
@@ -206,7 +217,10 @@ vrna_pf(vrna_fold_compound_t  *fc,
 
     /* calculate base pairing probability matrix (bppm)  */
     if (md->compute_bpp) {
+      t0 = vrna_pf_profile_enabled() ? vrna_pf_profile_now() : 0;
       vrna_pairing_probs(fc, structure);
+      if (vrna_pf_profile_enabled())
+        vrna_pf_profile_add_bpp(vrna_pf_profile_now() - t0);
 
 #ifndef VRNA_DISABLE_BACKWARD_COMPATIBILITY
 
@@ -321,12 +335,14 @@ vrna_pf_add(FLT_OR_DBL  dG1,
 PRIVATE int
 fill_arrays(vrna_fold_compound_t *fc)
 {
+  uint64_t            t0 = 0;
   int                 n, i, j, k, ij, *my_iindx, *jindx, with_gquad, with_ud;
   FLT_OR_DBL          temp, Qmax, *q, *qb, *qm, *qm1, *qm2, *q1k, *qln;
   double              max_real;
   vrna_ud_t           *domains_up;
   vrna_md_t           *md;
   vrna_mx_pf_t        *matrices;
+  vrna_pf_scratch_t   *scratch;
   vrna_mx_pf_aux_el_t aux_mx_el;
   vrna_mx_pf_aux_ml_t aux_mx_ml;
   vrna_exp_param_t    *pf_params;
@@ -346,11 +362,15 @@ fill_arrays(vrna_fold_compound_t *fc)
   qln         = matrices->qln;
   md          = &(pf_params->model_details);
   with_gquad  = md->gquad;
+  scratch     = (vrna_pf_scratch_t *)matrices->aux_pf;
 
   with_ud = (domains_up && domains_up->exp_energy_cb && (!(fc->type == VRNA_FC_TYPE_COMPARATIVE)));
   Qmax    = 0;
 
   max_real = (sizeof(FLT_OR_DBL) == sizeof(float)) ? FLT_MAX : DBL_MAX;
+
+  if (vrna_pf_profile_enabled())
+    t0 = vrna_pf_profile_now();
 
   if (with_ud && domains_up->exp_prod_cb)
     domains_up->exp_prod_cb(fc, domains_up->data);
@@ -422,9 +442,10 @@ fill_arrays(vrna_fold_compound_t *fc)
       if (q[ij] >= max_real) {
         vrna_log_warning("overflow while computing partition function for segment q[%d,%d]\n"
                              "use larger pf_scale", i, j);
-
-        vrna_exp_E_ml_fast_free(aux_mx_ml);
-        vrna_exp_E_ext_fast_free(aux_mx_el);
+        if (!scratch) {
+          vrna_exp_E_ml_fast_free(aux_mx_ml);
+          vrna_exp_E_ext_fast_free(aux_mx_el);
+        }
 
         return 0; /* failure */
       }
@@ -445,9 +466,13 @@ fill_arrays(vrna_fold_compound_t *fc)
     qln[n + 1]  = 1.0;
   }
 
-  /* free memory occupied by auxiliary arrays for fast exterior/multibranch loops */
-  vrna_exp_E_ml_fast_free(aux_mx_ml);
-  vrna_exp_E_ext_fast_free(aux_mx_el);
+  if (!scratch) {
+    vrna_exp_E_ml_fast_free(aux_mx_ml);
+    vrna_exp_E_ext_fast_free(aux_mx_el);
+  }
+
+  if (vrna_pf_profile_enabled())
+    vrna_pf_profile_add_fill_arrays(vrna_pf_profile_now() - t0);
 
   return 1;
 }
@@ -459,6 +484,7 @@ decompose_pair(vrna_fold_compound_t *fc,
                int                  j,
                vrna_mx_pf_aux_ml_t  aux_mx_ml)
 {
+  uint64_t      t0 = 0;
   unsigned int  n;
   int           *jindx, *pscore;
   FLT_OR_DBL    contribution;
@@ -466,6 +492,8 @@ decompose_pair(vrna_fold_compound_t *fc,
   vrna_hc_t     *hc;
 
   contribution  = 0.;
+  if (vrna_pf_profile_enabled())
+    t0 = vrna_pf_profile_now();
   n             = fc->length;
   hc            = fc->hc;
 
@@ -491,6 +519,9 @@ decompose_pair(vrna_fold_compound_t *fc,
       contribution  *= exp(pscore[jindx[j] + i] / kTn);
     }
   }
+
+  if (vrna_pf_profile_enabled())
+    vrna_pf_profile_add_decompose_pair(vrna_pf_profile_now() - t0);
 
   return contribution;
 }
@@ -518,10 +549,12 @@ postprocess_circular(vrna_fold_compound_t *fc)
   vrna_hc_t         *hc;
   vrna_sc_t         *sc, **scs;
   vrna_md_t         *md;
+  vrna_pf_scratch_t *scratch;
 
   n             = fc->length;
   n_seq         = (fc->type == VRNA_FC_TYPE_SINGLE) ? 1 : fc->n_seq;
   matrices      = fc->exp_matrices;
+  scratch       = (vrna_pf_scratch_t *)matrices->aux_pf;
   my_iindx      = fc->iindx;
   pf_params     = fc->exp_params;
   md            = &(pf_params->model_details);
@@ -648,7 +681,9 @@ postprocess_circular(vrna_fold_compound_t *fc)
 
   /* apply hard constraints if necessary */
   if (hc->f) {
-    qm1_tmp = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+    qm1_tmp = (scratch && scratch->qm1_tmp) ?
+              scratch->qm1_tmp :
+              (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
     qm1_tmp = memcpy(qm1_tmp, qm1, sizeof(FLT_OR_DBL) * (n + 2));
 
     for (k = turn + 2; k <= n; k++)
@@ -659,7 +694,9 @@ postprocess_circular(vrna_fold_compound_t *fc)
   /* apply soft constraints if necessary */
   if (sc_mb_wrapper.decomp_ml) {
     if (qm1_tmp == qm1) {
-      qm1_tmp = (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
+      qm1_tmp = (scratch && scratch->qm1_tmp) ?
+                scratch->qm1_tmp :
+                (FLT_OR_DBL *)vrna_alloc(sizeof(FLT_OR_DBL) * (n + 2));
       qm1_tmp = memcpy(qm1_tmp, qm1, sizeof(FLT_OR_DBL) * (n + 2));
     }
 
@@ -677,7 +714,8 @@ postprocess_circular(vrna_fold_compound_t *fc)
 
   qbt1 *= pow(expMLclosing, (double)n_seq);
 
-  if (qm1_tmp != qm1)
+  if ((qm1_tmp != qm1) &&
+      ((!scratch) || (qm1_tmp != scratch->qm1_tmp)))
     free(qm1_tmp);
 
   qmo += qbt1;

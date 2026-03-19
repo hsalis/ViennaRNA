@@ -49,6 +49,8 @@
 #include "ViennaRNA/backtrack/gquad.h"
 #include "ViennaRNA/sequences/alphabet.h"
 #include "ViennaRNA/mfe/global.h"
+#include "ViennaRNA/intern/mfe_profile.h"
+#include "ViennaRNA/intern/mfe_scratch.h"
 
 #include "ViennaRNA/intern/grammar_dat.h"
 
@@ -77,6 +79,28 @@ struct ms_helpers {
   struct sc_f5_dat      sc_wrapper;
 };
 
+
+struct decompose_pair_fast_ctx {
+  vrna_fold_compound_t  *fc;
+  vrna_param_t          *P;
+  vrna_hc_t             *hc;
+  char                  *ptype;
+  char                  *sequence;
+  short                 *S;
+  int                   *jindx;
+  int                   *rtype;
+  unsigned int          n;
+  unsigned int          dangle_model;
+  unsigned int          noLP;
+  unsigned int          noGUclosure;
+  unsigned int          *sn;
+  unsigned int          *ends;
+  int                   *cc;
+  int                   *cc1;
+  vrna_mx_mfe_aux_ml_t  ml_helpers;
+  struct ms_helpers     *ms_dat;
+};
+
 /*
  #################################
  # GLOBAL VARIABLES              #
@@ -98,6 +122,20 @@ struct ms_helpers {
 PRIVATE int
 fill_arrays(vrna_fold_compound_t  *fc,
             struct ms_helpers     *ms_dat);
+
+
+PRIVATE int
+fill_arrays_generic(vrna_fold_compound_t  *fc,
+                    struct ms_helpers     *ms_dat);
+
+
+PRIVATE int
+fill_arrays_single_fast(vrna_fold_compound_t *fc);
+
+
+PRIVATE int
+fill_arrays_dimer_fast(vrna_fold_compound_t  *fc,
+                       struct ms_helpers     *ms_dat);
 
 
 PRIVATE int
@@ -130,8 +168,28 @@ decompose_pair(vrna_fold_compound_t *fc,
                struct ms_helpers    *ms_dat);
 
 
-PRIVATE INLINE struct aux_arrays *
-get_aux_arrays(unsigned int length);
+PRIVATE INLINE int
+decompose_pair_fast(struct decompose_pair_fast_ctx *ctx,
+                    int                            i,
+                    int                            j);
+
+
+PRIVATE INLINE int
+decompose_pair_dimer_fast(struct decompose_pair_fast_ctx *ctx,
+                          int                            i,
+                          int                            j);
+
+
+PRIVATE INLINE int
+use_single_mfe_fast_path(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE int
+use_dimer_mfe_fast_path(vrna_fold_compound_t *fc);
+
+
+PRIVATE INLINE struct aux_arrays
+prepare_aux_arrays(vrna_mfe_scratch_t  *scratch);
 
 
 PRIVATE INLINE void
@@ -139,17 +197,13 @@ rotate_aux_arrays(struct aux_arrays *aux,
                   unsigned int      length);
 
 
-PRIVATE INLINE void
-free_aux_arrays(struct aux_arrays *aux);
-
-
-PRIVATE struct ms_helpers *
-get_ms_helpers(vrna_fold_compound_t *fc);
+PRIVATE void
+init_ms_helpers(vrna_fold_compound_t *fc,
+                struct ms_helpers    *ms_dat);
 
 
 PRIVATE void
-free_ms_helpers(struct ms_helpers *ms_dat,
-                size_t            strands);
+free_ms_helpers(struct ms_helpers *ms_dat);
 
 
 PRIVATE void
@@ -159,9 +213,19 @@ update_fms5_arrays(vrna_fold_compound_t *fc,
 
 
 PRIVATE void
+update_fms5_arrays_dimer_common(vrna_fold_compound_t *fc,
+                                int                  i);
+
+
+PRIVATE void
 update_fms3_arrays(vrna_fold_compound_t *fc,
                    unsigned int         s,
                    struct ms_helpers    *ms_dat);
+
+
+PRIVATE void
+update_fms3_arrays_dimer_common(vrna_fold_compound_t *fc,
+                                unsigned int         s);
 
 
 PRIVATE int
@@ -169,6 +233,27 @@ pair_multi_strand(vrna_fold_compound_t  *fc,
                   int                   i,
                   int                   j,
                   struct ms_helpers     *ms_dat);
+
+
+PRIVATE int
+pair_multi_strand_no_sc(vrna_fold_compound_t *fc,
+                        int                  i,
+                        int                  j);
+
+
+PRIVATE INLINE unsigned char
+hc_eval_ext_dimer_fast(int            i,
+                       int            j,
+                       int            k,
+                       int            l,
+                       unsigned char  d,
+                       vrna_hc_t      *hc);
+
+
+PRIVATE INLINE int
+pair_multi_strand_fast_dimer(struct decompose_pair_fast_ctx *ctx,
+                             int                            i,
+                             int                            j);
 
 
 PRIVATE int
@@ -212,11 +297,14 @@ vrna_mfe(vrna_fold_compound_t *fc,
   unsigned int      length;
   int               energy;
   float             mfe;
+  vrna_mfe_scratch_t *scratch;
   vrna_bts_t        bt_stack; /* stack of partial structures for backtracking */
   vrna_bps_t        bp;
+  struct ms_helpers ms_buf;
   struct ms_helpers *ms_dat;
 
-  bt_stack  = vrna_bts_init(MAXSECTORS);
+  scratch   = NULL;
+  bt_stack  = NULL;
   bp        = NULL;
 
   mfe = (float)(INF / 100.);
@@ -227,9 +315,16 @@ vrna_mfe(vrna_fold_compound_t *fc,
 
     if (!vrna_fold_compound_prepare(fc, VRNA_OPTION_MFE)) {
       vrna_log_warning("vrna_mfe@mfe.c: Failed to prepare vrna_fold_compound");
-      vrna_bts_free(bt_stack);
       return mfe;
     }
+
+    scratch   = (vrna_mfe_scratch_t *)fc->matrices->aux_mfe;
+    bt_stack  = scratch ? scratch->bt_stack : vrna_bts_init(MAXSECTORS);
+    bp        = scratch ? scratch->bp_stack : NULL;
+
+    vrna_bts_clear(bt_stack);
+    if (bp)
+      vrna_bps_clear(bp);
 
     /* call user-defined recursion status callback function */
     if (fc->stat_cb)
@@ -242,8 +337,13 @@ vrna_mfe(vrna_fold_compound_t *fc,
           fc->aux_grammar->cbs_status[i](fc, VRNA_STATUS_MFE_PRE, fc->aux_grammar->datas[i]);
     }
 
-    if (fc->strands > 1)
-      ms_dat = get_ms_helpers(fc);
+    if (fc->strands > 1) {
+      init_ms_helpers(fc, &ms_buf);
+      ms_dat = &ms_buf;
+    }
+
+    if (vrna_mfe_profile_enabled())
+      vrna_mfe_profile_reset();
 
     energy = fill_arrays(fc, ms_dat);
 
@@ -252,7 +352,14 @@ vrna_mfe(vrna_fold_compound_t *fc,
 
     if (structure && fc->params->model_details.backtrack) {
       /* add a guess of how many G's may be involved in a G quadruplex */
-      bp = vrna_bps_init(4 * (1 + length / 2));
+      uint64_t bt_t0 = 0;
+
+      if (vrna_mfe_profile_enabled())
+        bt_t0 = vrna_mfe_profile_now();
+
+      if (!bp)
+        bp = vrna_bps_init(4 * (1 + length / 2));
+
       if (backtrack(fc, bp, bt_stack, ms_dat) != 0) {
         if ((fc->aux_grammar) &&
             (fc->aux_grammar->serialize_bp)) {
@@ -267,7 +374,11 @@ vrna_mfe(vrna_fold_compound_t *fc,
         memset(structure, '\0', sizeof(char) * (length + 1));
       }
 
-      vrna_bps_free(bp);
+      if (!scratch)
+        vrna_bps_free(bp);
+
+      if (vrna_mfe_profile_enabled())
+        vrna_mfe_profile_add_backtrack(vrna_mfe_profile_now() - bt_t0);
     }
 
     /* call user-defined recursion status callback function */
@@ -299,10 +410,11 @@ vrna_mfe(vrna_fold_compound_t *fc,
         break;
     }
 
-    free_ms_helpers(ms_dat, fc->strands);
+    free_ms_helpers(ms_dat);
   }
 
-  vrna_bts_free(bt_stack);
+  if (!scratch)
+    vrna_bts_free(bt_stack);
 
   return mfe;
 }
@@ -314,10 +426,19 @@ vrna_backtrack_from_intervals(vrna_fold_compound_t  *fc,
                               sect                  bt_stack[],
                               int                   s)
 {
-  int i, ret = 0;
+  int               i, ret = 0;
+  struct ms_helpers ms_buf;
+  struct ms_helpers *ms_dat;
 
   if (fc) {
     vrna_bts_t bts;
+    ms_dat = NULL;
+
+    if (fc->strands > 1) {
+      init_ms_helpers(fc, &ms_buf);
+      ms_dat = &ms_buf;
+    }
+
     if (s > 0) {
       bts = vrna_bts_init((unsigned int)s);
       for (i = 0; i < s; i++)
@@ -332,7 +453,7 @@ vrna_backtrack_from_intervals(vrna_fold_compound_t  *fc,
     }
 
     vrna_bps_t bps = vrna_bps_init(0);
-    ret = backtrack(fc, bps, bts, NULL);
+    ret = backtrack(fc, bps, bts, ms_dat);
 
     /* copy bps elements to bp_stack?! */
     if (bp_stack) {
@@ -347,6 +468,7 @@ vrna_backtrack_from_intervals(vrna_fold_compound_t  *fc,
 
     vrna_bts_free(bts);
     vrna_bps_free(bps);
+    free_ms_helpers(ms_dat);
   }
 
   return ret;
@@ -420,6 +542,31 @@ PRIVATE int
 fill_arrays(vrna_fold_compound_t  *fc,
             struct ms_helpers     *ms_dat)
 {
+  uint64_t t0 = 0;
+  int      ret;
+
+  if (vrna_mfe_profile_enabled())
+    t0 = vrna_mfe_profile_now();
+
+  if (use_single_mfe_fast_path(fc))
+    ret = fill_arrays_single_fast(fc);
+  else if (use_dimer_mfe_fast_path(fc))
+    ret = fill_arrays_dimer_fast(fc, ms_dat);
+  else
+    ret = fill_arrays_generic(fc, ms_dat);
+
+  if (vrna_mfe_profile_enabled())
+    vrna_mfe_profile_add_fill_arrays(vrna_mfe_profile_now() - t0);
+
+  return ret;
+}
+
+
+/* fill DP matrices */
+PRIVATE int
+fill_arrays_generic(vrna_fold_compound_t  *fc,
+                    struct ms_helpers     *ms_dat)
+{
   unsigned int      *sn;
   unsigned int      i, j, length, uniq_ML;
   int               ij, *indx, *f5, *c, *fML, *fM1, *fM2_real;
@@ -427,7 +574,8 @@ fill_arrays(vrna_fold_compound_t  *fc,
   vrna_md_t         *md;
   vrna_mx_mfe_t     *matrices;
   vrna_ud_t         *domains_up;
-  struct aux_arrays *helper_arrays;
+  vrna_mfe_scratch_t *scratch;
+  struct aux_arrays  helper_arrays;
 
   length      = (int)fc->length;
   indx        = fc->jindx;
@@ -442,9 +590,9 @@ fill_arrays(vrna_fold_compound_t  *fc,
   fM2_real    = matrices->fM2_real;
   domains_up  = fc->domains_up;
   sn          = fc->strand_number;
+  scratch     = (vrna_mfe_scratch_t *)matrices->aux_mfe;
 
-  /* allocate memory for all helper arrays */
-  helper_arrays = get_aux_arrays(length);
+  helper_arrays = prepare_aux_arrays(scratch);
 
   /* pre-processing ligand binding production rule(s) */
   if (domains_up && domains_up->prod_cb)
@@ -464,9 +612,6 @@ fill_arrays(vrna_fold_compound_t  *fc,
 
   /* start recursion */
   if (length <= ((fc->strands > 1) ? fc->strands : (unsigned int)md->min_loop_size)) {
-    /* clean up memory */
-    free_aux_arrays(helper_arrays);
-
     /* return free energy of unfolded chain */
     return 0;
   }
@@ -480,17 +625,17 @@ fill_arrays(vrna_fold_compound_t  *fc,
       ij = indx[j] + i;
 
       /* decompose subsegment [i, j] with pair (i, j) */
-      c[ij] = decompose_pair(fc, i, j, helper_arrays, ms_dat);
+      c[ij] = decompose_pair(fc, i, j, &helper_arrays, ms_dat);
 
       /* decompose subsegment [i, j] that is multibranch loop part with at least two branches */
       if (fM2_real)
         fM2_real[ij] = vrna_mfe_multibranch_m2_fast(fc,
                                                     i,
                                                     j,
-                                                    helper_arrays->ml_helpers);
+                                                    helper_arrays.ml_helpers);
 
       /* decompose subsegment [i, j] that is multibranch loop part with at least one branch */
-      fML[ij] = vrna_mfe_multibranch_stems_fast(fc, i, j, helper_arrays->ml_helpers);
+      fML[ij] = vrna_mfe_multibranch_stems_fast(fc, i, j, helper_arrays.ml_helpers);
 
 
       /* decompose subsegment [i, j] that is multibranch loop part with exactly one branch */
@@ -504,7 +649,7 @@ fill_arrays(vrna_fold_compound_t  *fc,
             (void)fc->aux_grammar->aux[i].cb(fc, i, j, fc->aux_grammar->aux[i].data);
     } /* end of j-loop */
 
-    rotate_aux_arrays(helper_arrays, length);
+    rotate_aux_arrays(&helper_arrays, length);
 
     if (fc->strands > 1)
       update_fms5_arrays(fc, i, ms_dat);
@@ -514,8 +659,192 @@ fill_arrays(vrna_fold_compound_t  *fc,
      */
   (void)vrna_mfe_exterior_f5(fc);
 
-  /* clean up memory */
-  free_aux_arrays(helper_arrays);
+  return f5[length];
+}
+
+
+PRIVATE int
+fill_arrays_single_fast(vrna_fold_compound_t *fc)
+{
+  unsigned int                    i, j, length, uniq_ML;
+  int                             ij, *indx, *f5, *c, *fML, *fM1, *fM2_real;
+  vrna_param_t                    *P;
+  vrna_md_t                       *md;
+  vrna_mx_mfe_t                   *matrices;
+  vrna_mfe_scratch_t              *scratch;
+  struct aux_arrays               helper_arrays;
+  struct decompose_pair_fast_ctx  dctx;
+
+  length      = fc->length;
+  indx        = fc->jindx;
+  P           = fc->params;
+  md          = &(P->model_details);
+  uniq_ML     = md->uniq_ML;
+  matrices    = fc->matrices;
+  f5          = matrices->f5;
+  c           = matrices->c;
+  fML         = matrices->fML;
+  fM1         = matrices->fM1;
+  fM2_real    = matrices->fM2_real;
+  scratch     = (vrna_mfe_scratch_t *)matrices->aux_mfe;
+
+  helper_arrays = prepare_aux_arrays(scratch);
+  dctx          = (struct decompose_pair_fast_ctx){
+    .fc           = fc,
+    .P            = P,
+    .hc           = fc->hc,
+    .ptype        = fc->ptype,
+    .sequence     = fc->sequence,
+    .S            = fc->sequence_encoding,
+    .jindx        = indx,
+    .rtype        = &(md->rtype[0]),
+    .n            = length,
+    .dangle_model = md->dangles,
+    .noLP         = md->noLP,
+    .noGUclosure  = md->noGUclosure,
+    .sn           = NULL,
+    .ends         = NULL,
+    .cc           = helper_arrays.cc,
+    .cc1          = helper_arrays.cc1,
+    .ml_helpers   = helper_arrays.ml_helpers,
+    .ms_dat       = NULL
+  };
+
+  for (i = 1; i <= length; i++) {
+    c[indx[i] + i] = fML[indx[i] + i] = INF;
+
+    if (fM1)
+      fM1[indx[i] + i] = INF;
+
+    if (fM2_real)
+      for (j = i; j <= length; j++)
+        fM2_real[indx[j] + i] = INF;
+  }
+
+  if (length <= (unsigned int)md->min_loop_size) {
+    return 0;
+  }
+
+  for (i = length - 1; i >= 1; i--) {
+    for (j = i + 1; j <= length; j++) {
+      ij = indx[j] + i;
+
+      c[ij] = decompose_pair_fast(&dctx, i, j);
+
+      if (fM2_real)
+        fM2_real[ij] = vrna_mfe_multibranch_m2_fast(fc,
+                                                    i,
+                                                    j,
+                                                    helper_arrays.ml_helpers);
+
+      fML[ij] = vrna_mfe_multibranch_stems_fast(fc, i, j, helper_arrays.ml_helpers);
+
+      if (fM1)
+        fM1[ij] = vrna_mfe_multibranch_m1(fc, i, j);
+    }
+
+    rotate_aux_arrays(&helper_arrays, length);
+    dctx.cc  = helper_arrays.cc;
+    dctx.cc1 = helper_arrays.cc1;
+  }
+
+  (void)vrna_mfe_exterior_f5(fc);
+
+  return f5[length];
+}
+
+
+PRIVATE int
+fill_arrays_dimer_fast(vrna_fold_compound_t  *fc,
+                       struct ms_helpers     *ms_dat)
+{
+  unsigned int                    *sn;
+  unsigned int                    i, j, length;
+  int                             ij, *indx, *f5, *c, *fML, *fM1, *fM2_real;
+  vrna_param_t                    *P;
+  vrna_md_t                       *md;
+  vrna_mx_mfe_t                   *matrices;
+  vrna_mfe_scratch_t              *scratch;
+  struct aux_arrays               helper_arrays;
+  struct decompose_pair_fast_ctx  dctx;
+
+  length      = fc->length;
+  sn          = fc->strand_number;
+  indx        = fc->jindx;
+  P           = fc->params;
+  md          = &(P->model_details);
+  matrices    = fc->matrices;
+  f5          = matrices->f5;
+  c           = matrices->c;
+  fML         = matrices->fML;
+  fM1         = matrices->fM1;
+  fM2_real    = matrices->fM2_real;
+  scratch     = (vrna_mfe_scratch_t *)matrices->aux_mfe;
+
+  helper_arrays = prepare_aux_arrays(scratch);
+  dctx          = (struct decompose_pair_fast_ctx){
+    .fc           = fc,
+    .P            = P,
+    .hc           = fc->hc,
+    .ptype        = fc->ptype,
+    .sequence     = fc->sequence,
+    .S            = fc->sequence_encoding,
+    .jindx        = indx,
+    .rtype        = &(md->rtype[0]),
+    .n            = length,
+    .dangle_model = md->dangles,
+    .noLP         = md->noLP,
+    .noGUclosure  = md->noGUclosure,
+    .sn           = fc->strand_number,
+    .ends         = fc->strand_end,
+    .cc           = helper_arrays.cc,
+    .cc1          = helper_arrays.cc1,
+    .ml_helpers   = helper_arrays.ml_helpers,
+    .ms_dat       = ms_dat
+  };
+
+  for (i = 1; i <= length; i++) {
+    c[indx[i] + i] = fML[indx[i] + i] = INF;
+
+    if (fM1)
+      fM1[indx[i] + i] = INF;
+
+    if (fM2_real)
+      for (j = i; j <= length; j++)
+        fM2_real[indx[j] + i] = INF;
+  }
+
+  if (length <= fc->strands)
+    return 0;
+
+  for (i = length - 1; i >= 1; i--) {
+    if (sn[i] != sn[i + 1])
+      update_fms3_arrays(fc, sn[i + 1], ms_dat);
+
+    for (j = i + 1; j <= length; j++) {
+      ij = indx[j] + i;
+
+      c[ij] = decompose_pair_dimer_fast(&dctx, i, j);
+
+      if (fM2_real)
+        fM2_real[ij] = vrna_mfe_multibranch_m2_fast(fc,
+                                                    i,
+                                                    j,
+                                                    helper_arrays.ml_helpers);
+
+      fML[ij] = vrna_mfe_multibranch_stems_fast(fc, i, j, helper_arrays.ml_helpers);
+
+      if (fM1)
+        fM1[ij] = vrna_mfe_multibranch_m1(fc, i, j);
+    }
+
+    rotate_aux_arrays(&helper_arrays, length);
+    dctx.cc  = helper_arrays.cc;
+    dctx.cc1 = helper_arrays.cc1;
+    update_fms5_arrays(fc, i, ms_dat);
+  }
+
+  (void)vrna_mfe_exterior_f5(fc);
 
   return f5[length];
 }
@@ -2497,25 +2826,297 @@ fill_fM_d3(vrna_fold_compound_t *fc,
 
 #if 1
 
-PRIVATE struct ms_helpers *
-get_ms_helpers(vrna_fold_compound_t *fc)
+PRIVATE void
+init_ms_helpers(vrna_fold_compound_t *fc,
+                struct ms_helpers    *ms_dat)
 {
-  struct ms_helpers *dat = (struct ms_helpers *)vrna_alloc(sizeof(struct ms_helpers));
-
-  init_sc_f5(fc, &(dat->sc_wrapper));
-
-  return dat;
+  init_sc_f5(fc, &(ms_dat->sc_wrapper));
 }
 
 
 PRIVATE void
-free_ms_helpers(struct ms_helpers *ms_dat,
-                size_t            strands)
+free_ms_helpers(struct ms_helpers *ms_dat)
 {
-  if (strands > 1)
+  if (ms_dat)
     free_sc_f5(&(ms_dat->sc_wrapper));
+}
 
-  free(ms_dat);
+
+PRIVATE INLINE unsigned char
+hc_eval_ext_dimer_fast(int            i,
+                       int            j,
+                       int            k,
+                       int            l,
+                       unsigned char  d,
+                       vrna_hc_t      *hc)
+{
+  unsigned int  n, di, dj, *sn;
+
+  sn  = hc->sn;
+  n   = hc->n;
+  di  = (unsigned int)(k - i);
+  dj  = (unsigned int)(j - l);
+
+  switch (d) {
+    case VRNA_DECOMP_EXT_EXT_STEM:
+      if ((sn[k] != sn[l]) ||
+          !(hc->mx[n * j + l] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP))
+        return (unsigned char)0;
+
+      if (i != l) {
+        di = (unsigned int)(l - k - 1);
+        if ((di != 0U) && (hc->up_ext[k + 1] < di))
+          return (unsigned char)0;
+      }
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_STEM_EXT:
+      if ((sn[k] != sn[l]) ||
+          !(hc->mx[n * k + i] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP))
+        return (unsigned char)0;
+
+      if (i != l) {
+        di = (unsigned int)(l - k - 1);
+        if ((di != 0U) && (hc->up_ext[k + 1] < di))
+          return (unsigned char)0;
+      }
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_EXT_STEM1:
+      if ((sn[j - 1] != sn[j]) ||
+          (sn[k] != sn[l]) ||
+          !(hc->mx[n * (j - 1) + l] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP) ||
+          (hc->up_ext[j] == 0))
+        return (unsigned char)0;
+
+      if (i != l) {
+        di = (unsigned int)(l - k - 1);
+        if ((di != 0U) && (hc->up_ext[k + 1] < di))
+          return (unsigned char)0;
+      }
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_STEM_EXT1:
+      if ((sn[i] != sn[i + 1]) ||
+          (sn[k] != sn[l]) ||
+          !(hc->mx[n * k + i + 1] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP) ||
+          (hc->up_ext[i] == 0))
+        return (unsigned char)0;
+
+      if (j != k) {
+        dj = (unsigned int)(l - k - 1);
+        if ((dj != 0U) && (hc->up_ext[k + 1] < dj))
+          return (unsigned char)0;
+      }
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_EXT_EXT:
+      if (sn[k] != sn[l])
+        return (unsigned char)0;
+
+      di = (unsigned int)(l - k - 1);
+      return ((di == 0U) || (hc->up_ext[k + 1] >= di)) ? (unsigned char)1 : (unsigned char)0;
+
+    case VRNA_DECOMP_EXT_STEM:
+      if ((sn[i] != sn[k]) ||
+          (sn[l] != sn[j]) ||
+          !(hc->mx[n * k + l] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP))
+        return (unsigned char)0;
+
+      if ((di != 0U) && (hc->up_ext[i] < di))
+        return (unsigned char)0;
+
+      if ((dj != 0U) && (hc->up_ext[l + 1] < dj))
+        return (unsigned char)0;
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_EXT:
+      if ((sn[i] != sn[k]) || (sn[l] != sn[j]))
+        return (unsigned char)0;
+
+      if ((di != 0U) && (hc->up_ext[i] < di))
+        return (unsigned char)0;
+
+      if ((dj != 0U) && (hc->up_ext[l + 1] < dj))
+        return (unsigned char)0;
+
+      return (unsigned char)1;
+
+    case VRNA_DECOMP_EXT_UP:
+      if (sn[i] != sn[j])
+        return (unsigned char)0;
+
+      di = (unsigned int)(j - i + 1);
+      return (hc->up_ext[i] >= di) ? (unsigned char)1 : (unsigned char)0;
+
+    case VRNA_DECOMP_EXT_STEM_OUTSIDE:
+      if (((k > i) && (sn[k - 1] != sn[k])) ||
+          ((l < j) && (sn[l + 1] != sn[l])) ||
+          !(hc->mx[n * k + l] & VRNA_CONSTRAINT_CONTEXT_EXT_LOOP))
+        return (unsigned char)0;
+
+      return (unsigned char)1;
+
+    default:
+      return hc->eval_ext(i, j, k, l, d, hc);
+  }
+}
+
+
+PRIVATE void
+update_fms5_arrays_dimer_common(vrna_fold_compound_t *fc,
+                                int                  i)
+{
+  short         *S1, *S2, s5, s3;
+  unsigned int  *sn, *se, type;
+  int           e, tmp, **fms5, *c, *idx, n, end, dangle_model, base;
+  vrna_param_t  *params;
+  vrna_md_t     *md;
+  vrna_hc_t     *hc;
+
+  n             = fc->length;
+  S1            = fc->sequence_encoding;
+  S2            = fc->sequence_encoding2;
+  idx           = fc->jindx;
+  c             = fc->matrices->c;
+  fms5          = fc->matrices->fms5;
+  sn            = fc->strand_number;
+  se            = fc->strand_end;
+  params        = fc->params;
+  md            = &(params->model_details);
+  dangle_model  = md->dangles;
+  hc            = fc->hc;
+
+  for (size_t s = 0; s < fc->strands; s++) {
+    e   = tmp = INF;
+    end = se[s];
+
+    if (i < end) {
+      if (hc_eval_ext_dimer_fast(i, end, i + 1, end, VRNA_DECOMP_EXT_EXT, hc))
+        tmp = fms5[s][i + 1];
+    } else {
+      tmp = 0;
+    }
+
+    e = MIN2(e, tmp);
+
+    for (int k = i + 1; k < end; k++) {
+      if ((hc_eval_ext_dimer_fast(i, end, k, k + 1, VRNA_DECOMP_EXT_STEM_EXT, hc)) &&
+          (fms5[s][k + 1] != INF) &&
+          (c[idx[k] + i] != INF)) {
+        type = vrna_get_ptype_md(S2[i], S2[k], md);
+
+        switch (dangle_model) {
+          case 2:
+            s5  = ((i > 1) && (sn[i - 1] == sn[i])) ? S1[i - 1] : -1;
+            s3  = ((k < n) && (sn[k] == sn[k + 1])) ? S1[k + 1] : -1;
+            break;
+
+          default:
+            s5 = s3 = -1;
+            break;
+        }
+
+        base  = vrna_E_exterior_stem(type, s5, s3, params);
+        tmp   = base + fms5[s][k + 1] + c[idx[k] + i];
+        e     = MIN2(e, tmp);
+      }
+    }
+
+    if ((hc_eval_ext_dimer_fast(i, end, i, end, VRNA_DECOMP_EXT_STEM, hc)) &&
+        (c[idx[end] + i] != INF)) {
+      type = vrna_get_ptype_md(S2[i], S2[end], md);
+      switch (dangle_model) {
+        case 2:
+          s5  = ((i > 1) && (sn[i - 1] == sn[i])) ? S1[i - 1] : -1;
+          s3  = -1;
+          break;
+
+        default:
+          s5 = s3 = -1;
+          break;
+      }
+
+      base  = vrna_E_exterior_stem(type, s5, s3, params);
+      tmp   = base + c[idx[end] + i];
+      e     = MIN2(e, tmp);
+    }
+
+    if (dangle_model % 2) {
+      s5 = S1[i];
+
+      for (int k = i + 2; k + 1 < end; k++) {
+        if ((hc_eval_ext_dimer_fast(i, end, k, k + 1, VRNA_DECOMP_EXT_STEM_EXT1, hc)) &&
+            (fms5[s][k + 1] != INF) &&
+            (c[idx[k] + i + 1] != INF)) {
+          type  = vrna_get_ptype_md(S2[i + 1], S2[k], md);
+          base  = vrna_E_exterior_stem(type, s5, -1, params);
+          tmp   = base + fms5[s][k + 1] + c[idx[k] + i + 1];
+          e     = MIN2(e, tmp);
+        }
+      }
+
+      for (int k = i + 1; k + 1 < end; k++) {
+        s3 = S1[k + 1];
+
+        if ((hc_eval_ext_dimer_fast(i, end, k, k + 2, VRNA_DECOMP_EXT_STEM_EXT, hc)) &&
+            (fms5[s][k + 2] != INF) &&
+            (c[idx[k] + i] != INF)) {
+          type  = vrna_get_ptype_md(S2[i], S2[k], md);
+          base  = vrna_E_exterior_stem(type, -1, s3, params);
+          tmp   = base + fms5[s][k + 2] + c[idx[k] + i];
+          e     = MIN2(e, tmp);
+        }
+
+        if ((hc_eval_ext_dimer_fast(i, end, k, k + 2, VRNA_DECOMP_EXT_STEM_EXT1, hc)) &&
+            (fms5[s][k + 2] != INF) &&
+            (c[idx[k] + i + 1] != INF) &&
+            (i + 1 < k)) {
+          type  = vrna_get_ptype_md(S2[i + 1], S2[k], md);
+          base  = vrna_E_exterior_stem(type, s5, s3, params);
+          tmp   = base + fms5[s][k + 2] + c[idx[k] + i + 1];
+          e     = MIN2(e, tmp);
+        }
+      }
+
+      s5  = S1[i];
+      s3  = S1[end];
+
+      if ((hc_eval_ext_dimer_fast(i, end, i, end - 1, VRNA_DECOMP_EXT_STEM, hc)) &&
+          (c[idx[end - 1] + i] != INF) &&
+          (i + 1 < end)) {
+        type  = vrna_get_ptype_md(S2[i], S2[end - 1], md);
+        base  = vrna_E_exterior_stem(type, -1, s3, params);
+        tmp   = base + c[idx[end - 1] + i];
+        e     = MIN2(e, tmp);
+      }
+
+      if ((hc_eval_ext_dimer_fast(i, end, i + 1, end, VRNA_DECOMP_EXT_STEM, hc)) &&
+          (c[idx[end] + i + 1] != INF) &&
+          (i + 1 < end)) {
+        type  = vrna_get_ptype_md(S2[i + 1], S2[end], md);
+        base  = vrna_E_exterior_stem(type, s5, -1, params);
+        tmp   = base + c[idx[end] + i + 1];
+        e     = MIN2(e, tmp);
+      }
+
+      if ((hc_eval_ext_dimer_fast(i, end, i + 1, end - 1, VRNA_DECOMP_EXT_STEM, hc)) &&
+          (c[idx[end - 1] + i + 1] != INF) &&
+          (i + 2 < end)) {
+        type  = vrna_get_ptype_md(S2[i + 1], S2[end - 1], md);
+        base  = vrna_E_exterior_stem(type, s5, s3, params);
+        tmp   = base + c[idx[end - 1] + i + 1];
+        e     = MIN2(e, tmp);
+      }
+    }
+
+    fms5[s][i] = e;
+  }
 }
 
 
@@ -2551,6 +3152,15 @@ update_fms5_arrays(vrna_fold_compound_t *fc,
   sc_spl        = sc_wrapper->decomp;
   sc_red_stem   = sc_wrapper->red_stem;
   sc_red_ext    = sc_wrapper->red_ext;
+
+  if ((fc->strands == 2) &&
+      (!hc->f) &&
+      (!sc_spl) &&
+      (!sc_red_stem) &&
+      (!sc_red_ext)) {
+    update_fms5_arrays_dimer_common(fc, i);
+    return;
+  }
 
 
   for (size_t s = 0; s < fc->strands; s++) {
@@ -2744,6 +3354,158 @@ update_fms5_arrays(vrna_fold_compound_t *fc,
 
 
 PRIVATE void
+update_fms3_arrays_dimer_common(vrna_fold_compound_t *fc,
+                                unsigned int         s)
+{
+  short         *S1, *S2, s5, s3;
+  unsigned int  *sn, *ss, type;
+  int           *c, **fms3, base, e, tmp, j, k, start, n, *idx, dangle_model;
+  vrna_param_t  *params;
+  vrna_md_t     *md;
+  vrna_hc_t     *hc;
+
+  n             = fc->length;
+  S1            = fc->sequence_encoding;
+  S2            = fc->sequence_encoding2;
+  idx           = fc->jindx;
+  c             = fc->matrices->c;
+  fms3          = fc->matrices->fms3;
+  sn            = fc->strand_number;
+  ss            = fc->strand_start;
+  params        = fc->params;
+  md            = &(params->model_details);
+  dangle_model  = md->dangles;
+  hc            = fc->hc;
+
+  start = ss[s];
+
+  for (j = start; j <= n; j++) {
+    e = tmp = INF;
+
+    if (start < j) {
+      if (hc_eval_ext_dimer_fast(start, j, start, j - 1, VRNA_DECOMP_EXT_EXT, hc)) {
+        tmp = fms3[s][j - 1];
+        e   = MIN2(e, tmp);
+      }
+    } else {
+      e = 0;
+    }
+
+    if (hc_eval_ext_dimer_fast(start, j, start, j, VRNA_DECOMP_EXT_STEM, hc) &&
+        (c[idx[j] + start] != INF)) {
+      type = vrna_get_ptype_md(S2[start], S2[j], md);
+
+      switch (dangle_model) {
+        case 2:
+          s5  = -1;
+          s3  = (sn[j] == sn[j + 1]) ? S1[j + 1] : -1;
+          break;
+
+        default:
+          s5 = s3 = -1;
+          break;
+      }
+
+      base  = vrna_E_exterior_stem(type, s5, s3, params);
+      tmp   = base + c[idx[j] + start];
+      e     = MIN2(e, tmp);
+    }
+
+    for (k = start; k < j; k++) {
+      if (hc_eval_ext_dimer_fast(start, j, k, k + 1, VRNA_DECOMP_EXT_EXT_STEM, hc) &&
+          (fms3[s][k] != INF) &&
+          (c[idx[j] + k + 1] != INF)) {
+        type = vrna_get_ptype_md(S2[k + 1], S2[j], md);
+
+        switch (dangle_model) {
+          case 2:
+            s5  = (sn[k] == sn[k + 1]) ? S1[k] : -1;
+            s3  = (sn[j] == sn[j + 1]) ? S1[j + 1] : -1;
+            break;
+
+          default:
+            s5 = s3 = -1;
+            break;
+        }
+
+        base  = vrna_E_exterior_stem(type, s5, s3, params);
+        tmp   = base + fms3[s][k] + c[idx[j] + k + 1];
+        e     = MIN2(e, tmp);
+      }
+    }
+
+    if (dangle_model % 2) {
+      s5  = S1[start];
+      s3  = S1[j];
+
+      if (hc_eval_ext_dimer_fast(start, j, start, j - 1, VRNA_DECOMP_EXT_STEM, hc) &&
+          (c[idx[j - 1] + start] != INF) &&
+          (start + 1 < j)) {
+        type  = vrna_get_ptype_md(S2[start], S2[j - 1], md);
+        base  = vrna_E_exterior_stem(type, -1, s3, params);
+        tmp   = base + c[idx[j - 1] + start];
+        e     = MIN2(e, tmp);
+      }
+
+      if (hc_eval_ext_dimer_fast(start, j, start + 1, j, VRNA_DECOMP_EXT_STEM, hc) &&
+          (c[idx[j] + start + 1] != INF) &&
+          (start + 1 < j)) {
+        type  = vrna_get_ptype_md(S2[start + 1], S2[j], md);
+        base  = vrna_E_exterior_stem(type, s5, -1, params);
+        tmp   = base + c[idx[j] + start + 1];
+        e     = MIN2(e, tmp);
+      }
+
+      if (hc_eval_ext_dimer_fast(start, j, start + 1, j - 1, VRNA_DECOMP_EXT_STEM, hc) &&
+          (c[idx[j - 1] + start + 1] != INF) &&
+          (start + 2 < j)) {
+        type  = vrna_get_ptype_md(S2[start + 1], S2[j - 1], md);
+        base  = vrna_E_exterior_stem(type, s5, s3, params);
+        tmp   = base + c[idx[j - 1] + start + 1];
+        e     = MIN2(e, tmp);
+      }
+
+      for (k = start; k < j; k++) {
+        s5 = S1[k + 1];
+
+        if (hc_eval_ext_dimer_fast(start, j, k, k + 2, VRNA_DECOMP_EXT_EXT_STEM, hc) &&
+            (fms3[s][k] != INF) &&
+            (c[idx[j] + k + 2] != INF) &&
+            (k + 2 < j)) {
+          type  = vrna_get_ptype_md(S2[k + 2], S2[j], md);
+          base  = vrna_E_exterior_stem(type, s5, -1, params);
+          tmp   = base + fms3[s][k] + c[idx[j] + k + 2];
+          e     = MIN2(e, tmp);
+        }
+
+        if (hc_eval_ext_dimer_fast(start, j, k, k + 1, VRNA_DECOMP_EXT_EXT_STEM1, hc) &&
+            (fms3[s][k] != INF) &&
+            (c[idx[j - 1] + k + 1] != INF) &&
+            (k + 2 < j)) {
+          type  = vrna_get_ptype_md(S2[k + 1], S2[j - 1], md);
+          base  = vrna_E_exterior_stem(type, -1, s3, params);
+          tmp   = base + fms3[s][k] + c[idx[j - 1] + k + 1];
+          e     = MIN2(e, tmp);
+        }
+
+        if (hc_eval_ext_dimer_fast(start, j, k, k + 2, VRNA_DECOMP_EXT_EXT_STEM1, hc) &&
+            (fms3[s][k] != INF) &&
+            (c[idx[j - 1] + k + 2] != INF) &&
+            (k + 3 < j)) {
+          type  = vrna_get_ptype_md(S2[k + 2], S2[j - 1], md);
+          base  = vrna_E_exterior_stem(type, s5, s3, params);
+          tmp   = base + fms3[s][k] + c[idx[j - 1] + k + 2];
+          e     = MIN2(e, tmp);
+        }
+      }
+    }
+
+    fms3[s][j] = e;
+  }
+}
+
+
+PRIVATE void
 update_fms3_arrays(vrna_fold_compound_t *fc,
                    unsigned int         s,
                    struct ms_helpers    *ms_dat)
@@ -2775,6 +3537,15 @@ update_fms3_arrays(vrna_fold_compound_t *fc,
   sc_spl        = sc_wrapper->decomp;
   sc_red_stem   = sc_wrapper->red_stem;
   sc_red_ext    = sc_wrapper->red_ext;
+
+  if ((fc->strands == 2) &&
+      (!hc->f) &&
+      (!sc_spl) &&
+      (!sc_red_stem) &&
+      (!sc_red_ext)) {
+    update_fms3_arrays_dimer_common(fc, s);
+    return;
+  }
 
   start = ss[s];
 
@@ -2967,6 +3738,225 @@ update_fms3_arrays(vrna_fold_compound_t *fc,
 
 
 PRIVATE int
+pair_multi_strand_no_sc(vrna_fold_compound_t *fc,
+                        int                  i,
+                        int                  j)
+{
+  short         *S1, *S2, s5, s3;
+  unsigned int  *sn, *ends, type, nick;
+  int           start, contribution, **fms5, **fms3, base, tmp, tmp2, dangle_model;
+  vrna_param_t  *params;
+  vrna_md_t     *md;
+  vrna_hc_t     *hc;
+
+  contribution  = INF;
+  S1            = fc->sequence_encoding;
+  S2            = fc->sequence_encoding2;
+  params        = fc->params;
+  md            = &(params->model_details);
+  dangle_model  = md->dangles;
+  sn            = fc->strand_number;
+  ends          = fc->strand_end;
+  fms5          = fc->matrices->fms5;
+  fms3          = fc->matrices->fms3;
+  hc            = fc->hc;
+
+  if ((sn[i] != sn[j]) &&
+      (hc_eval_ext_dimer_fast(i, j, i, j, VRNA_DECOMP_EXT_STEM, hc))) {
+    type = vrna_get_ptype_md(S2[j], S2[i], md);
+
+    switch (dangle_model) {
+      case 2:
+        s5  = (sn[j] == sn[j - 1]) ? S1[j - 1] : -1;
+        s3  = (sn[i] == sn[i + 1]) ? S1[i + 1] : -1;
+        break;
+
+      default:
+        s5 = s3 = -1;
+        break;
+    }
+
+    base = vrna_E_exterior_stem(type, s5, s3, params) +
+           params->DuplexInit;
+
+    tmp = INF;
+
+    if (sn[i] != sn[i + 1]) {
+      if ((sn[j - 1] != sn[j]) &&
+          (i + 1 == j)) {
+        tmp2  = 0;
+        tmp   = MIN2(tmp, tmp2);
+      } else if (sn[j - 1] == sn[j]) {
+        tmp2  = fms3[sn[i + 1]][j - 1];
+        tmp   = MIN2(tmp, tmp2);
+      }
+    } else if (sn[j - 1] != sn[j]) {
+      tmp2  = fms5[sn[j - 1]][i + 1];
+      tmp   = MIN2(tmp, tmp2);
+    } else {
+      if ((fms5[sn[i]][i + 1] != INF) &&
+          (fms3[sn[ends[sn[i]] + 1]][j - 1] != INF)) {
+        tmp2 = 0;
+
+        if (ends[sn[i]] > (unsigned int)i)
+          tmp2 += fms5[sn[i]][i + 1];
+
+        if ((unsigned int)(j - 1) > ends[sn[i]])
+          tmp2 += fms3[sn[ends[sn[i]] + 1]][j - 1];
+
+        tmp = MIN2(tmp, tmp2);
+      }
+
+      nick = ends[sn[i]] + 1;
+      while (sn[nick] != sn[j]) {
+        if ((fms5[sn[nick]][i + 1] != INF) &&
+            (fms3[sn[ends[sn[nick]] + 1]][j - 1] != INF)) {
+          tmp2 = 0;
+          if ((unsigned int)(i + 1) <= ends[sn[nick]])
+            tmp2 += fms5[sn[nick]][i + 1];
+
+          if (ends[sn[nick]] + 1 <= (unsigned int)(j - 1))
+            tmp2 += fms3[sn[ends[sn[nick]] + 1]][j - 1];
+
+          tmp = MIN2(tmp, tmp2);
+        }
+
+        nick = ends[sn[nick]] + 1;
+      }
+    }
+
+    if (tmp != INF)
+      contribution = base + tmp;
+
+    if (dangle_model % 2) {
+      s5  = (sn[j] == sn[j - 1]) ? S1[j - 1] : -1;
+      s3  = (sn[i] == sn[i + 1]) ? S1[i + 1] : -1;
+
+      if ((j > i + 1) &&
+          (sn[i] != sn[i + 1]) &&
+          (sn[j - 1] == sn[j])) {
+        tmp = vrna_E_exterior_stem(type, s5, -1, params) +
+              params->DuplexInit;
+
+        if (sn[j - 2] == sn[j]) {
+          if (fms3[sn[i + 1]][j - 2] != INF) {
+            tmp           += fms3[sn[i + 1]][j - 2];
+            contribution  = MIN2(contribution, tmp);
+          }
+        } else {
+          contribution = MIN2(contribution, tmp);
+        }
+      } else if ((i + 1 < j) &&
+                 (sn[j - 1] != sn[j]) &&
+                 (sn[i] == sn[i + 1])) {
+        tmp = vrna_E_exterior_stem(type, -1, s3, params) +
+              params->DuplexInit;
+
+        if (sn[i] == sn[i + 2]) {
+          if (fms5[sn[j - 1]][i + 2] != INF) {
+            tmp           += fms5[sn[j - 1]][i + 2];
+            contribution  = MIN2(contribution, tmp);
+          }
+        } else {
+          contribution = MIN2(contribution, tmp);
+        }
+      } else if ((sn[i] == sn[i + 1]) &&
+                 (sn[j - 1] == sn[j])) {
+        tmp   = INF;
+        base  = vrna_E_exterior_stem(type, s5, s3, params) +
+                params->DuplexInit;
+
+        start = i;
+        nick  = ends[sn[start]] + 1;
+        do {
+          if ((fms5[sn[start]][i + 2] != INF) &&
+              (fms3[sn[nick]][j - 2] != INF)) {
+            tmp2 = 0;
+
+            if (nick > (unsigned int)(i + 2))
+              tmp2 += fms5[sn[start]][i + 2];
+
+            if ((unsigned int)j > nick + 1)
+              tmp2 += fms3[sn[nick]][j - 2];
+
+            tmp = MIN2(tmp, tmp2);
+          }
+
+          start = nick;
+          nick  = ends[sn[nick]] + 1;
+        } while (sn[nick] != sn[j]);
+
+        if (tmp != INF) {
+          tmp           += base;
+          contribution  = MIN2(contribution, tmp);
+        }
+
+        tmp   = INF;
+        base  = vrna_E_exterior_stem(type, -1, s3, params) +
+                params->DuplexInit;
+
+        start = i;
+        nick  = ends[sn[start]] + 1;
+        do {
+          if ((fms5[sn[start]][i + 2] != INF) &&
+              (fms3[sn[nick]][j - 1] != INF)) {
+            tmp2 = 0;
+
+            if (nick > (unsigned int)(i + 2))
+              tmp2 += fms5[sn[start]][i + 2];
+
+            if ((unsigned int)j > nick)
+              tmp2 += fms3[sn[nick]][j - 1];
+
+            tmp = MIN2(tmp, tmp2);
+          }
+
+          start = nick;
+          nick  = ends[sn[nick]] + 1;
+        } while (sn[nick] != sn[j]);
+
+        if (tmp != INF) {
+          tmp           += base;
+          contribution  = MIN2(contribution, tmp);
+        }
+
+        tmp   = INF;
+        base  = vrna_E_exterior_stem(type, s5, -1, params) +
+                params->DuplexInit;
+
+        start = i;
+        nick  = ends[sn[start]] + 1;
+        do {
+          if ((fms5[sn[start]][i + 1] != INF) &&
+              (fms3[sn[nick]][j - 2] != INF)) {
+            tmp2 = 0;
+
+            if (nick > (unsigned int)(i + 1))
+              tmp2 += fms5[sn[start]][i + 1];
+
+            if ((unsigned int)j > nick + 1)
+              tmp2 += fms3[sn[nick]][j - 2];
+
+            tmp = MIN2(tmp, tmp2);
+          }
+
+          start = nick;
+          nick  = ends[sn[nick]] + 1;
+        } while (sn[nick] != sn[j]);
+
+        if (tmp != INF) {
+          tmp           += base;
+          contribution  = MIN2(contribution, tmp);
+        }
+      }
+    }
+  }
+
+  return contribution;
+}
+
+
+PRIVATE int
 pair_multi_strand(vrna_fold_compound_t  *fc,
                   int                   i,
                   int                   j,
@@ -2994,6 +3984,9 @@ pair_multi_strand(vrna_fold_compound_t  *fc,
   hc            = fc->hc;
   sc_wrapper    = &(ms_dat->sc_wrapper);
   sc_red_stem   = sc_wrapper->red_stem;
+
+  if (!sc_red_stem)
+    return pair_multi_strand_no_sc(fc, i, j);
 
   if ((sn[i] != sn[j]) &&
       (hc->eval_ext(i, j, i, j, VRNA_DECOMP_EXT_STEM, hc))) {
@@ -4291,15 +5284,233 @@ backtrack_exit:
 
 
 PRIVATE INLINE int
+use_single_mfe_fast_path(vrna_fold_compound_t *fc)
+{
+  vrna_md_t *md;
+  vrna_sc_t *sc;
+
+  if ((!fc) ||
+      (fc->type != VRNA_FC_TYPE_SINGLE) ||
+      (fc->strands != 1) ||
+      (!fc->params) ||
+      (!fc->hc) ||
+      (!fc->matrices))
+    return 0;
+
+  md = &(fc->params->model_details);
+  sc = fc->sc;
+
+  if ((md->circ) ||
+      (md->gquad) ||
+      (fc->domains_up) ||
+      (fc->aux_grammar) ||
+      (fc->hc->f))
+    return 0;
+
+  if (sc) {
+    if ((sc->f) ||
+        (sc->exp_f) ||
+        (sc->bt))
+      return 0;
+  }
+
+  return 1;
+}
+
+
+PRIVATE INLINE int
+use_dimer_mfe_fast_path(vrna_fold_compound_t *fc)
+{
+  /*
+   * The dimer fast-path remains exact on the regression suite, but it is not
+   * measurably faster on the current RNAcofold benchmark. Keep it disabled
+   * until the multistrand decomposition is specialized enough to produce a
+   * clear runtime win.
+   */
+  (void)fc;
+  return 0;
+
+#if 0
+  vrna_md_t *md;
+  vrna_sc_t *sc;
+
+  if ((!fc) ||
+      (fc->type != VRNA_FC_TYPE_SINGLE) ||
+      (fc->strands != 2) ||
+      (!fc->params) ||
+      (!fc->hc) ||
+      (!fc->matrices))
+    return 0;
+
+  md = &(fc->params->model_details);
+  sc = fc->sc;
+
+  if ((md->circ) ||
+      (md->gquad) ||
+      (fc->domains_up) ||
+      (fc->aux_grammar) ||
+      (fc->hc->f))
+    return 0;
+
+  if (sc) {
+    if ((sc->f) ||
+        (sc->exp_f) ||
+        (sc->bt))
+      return 0;
+  }
+
+  return 1;
+#endif
+}
+
+
+PRIVATE INLINE int
+decompose_pair_fast(struct decompose_pair_fast_ctx *ctx,
+                    int                            i,
+                    int                            j)
+{
+  uint64_t        t0 = 0;
+  unsigned char   hc_decompose;
+  unsigned int    type;
+  int             e, new_c, energy, stackEnergy, ij, *cc, *cc1;
+  vrna_md_t       *md;
+
+  if (vrna_mfe_profile_enabled())
+    t0 = vrna_mfe_profile_now();
+
+  md            = &(ctx->P->model_details);
+  ij            = ctx->jindx[j] + i;
+  hc_decompose  = ctx->hc->mx[ctx->n * i + j];
+  cc            = ctx->cc;
+  cc1           = ctx->cc1;
+  e             = INF;
+
+  if (hc_decompose) {
+    new_c = INF;
+    type  = (unsigned int)ctx->ptype[ij];
+    type  = (type == 0) ? 7U : type;
+
+    if ((hc_decompose & VRNA_CONSTRAINT_CONTEXT_HP_LOOP) &&
+        !(ctx->noGUclosure &&
+          ((type == 3U) || (type == 4U))))
+      energy = vrna_E_hairpin((unsigned int)(j - i - 1),
+                              type,
+                              ctx->S[i + 1],
+                              ctx->S[j - 1],
+                              ctx->sequence + i - 1,
+                              ctx->P);
+    else
+      energy = INF;
+
+    new_c   = MIN2(new_c, energy);
+
+    energy  = vrna_mfe_multibranch_loop_fast(ctx->fc, i, j, ctx->ml_helpers);
+    new_c   = MIN2(new_c, energy);
+
+    if (ctx->dangle_model == 3) {
+      energy  = vrna_mfe_multibranch_loop_stack(ctx->fc, i, j);
+      new_c   = MIN2(new_c, energy);
+    }
+
+    energy  = vrna_mfe_internal(ctx->fc, i, j);
+    new_c   = MIN2(new_c, energy);
+
+    if (ctx->noLP) {
+      if ((i + 2 < j) &&
+          (hc_decompose & VRNA_CONSTRAINT_CONTEXT_INT_LOOP) &&
+          (ctx->hc->mx[ctx->n * (i + 1) + (j - 1)] & VRNA_CONSTRAINT_CONTEXT_INT_LOOP_ENC)) {
+        unsigned int inner_type;
+
+        inner_type   = (unsigned int)ctx->ptype[ctx->jindx[j - 1] + i + 1];
+        inner_type   = (inner_type == 0) ? 7U : inner_type;
+        stackEnergy  = ctx->P->stack[type][ctx->rtype[inner_type]];
+      } else {
+        stackEnergy = INF;
+      }
+
+      new_c       = MIN2(new_c, cc1[j - 1] + stackEnergy);
+      cc[j]       = new_c;
+      e           = cc1[j - 1] + stackEnergy;
+    } else {
+      e = new_c;
+    }
+  }
+
+  if (vrna_mfe_profile_enabled())
+    vrna_mfe_profile_add_decompose_pair(vrna_mfe_profile_now() - t0);
+
+  return e;
+}
+
+
+PRIVATE INLINE int
+decompose_pair_dimer_fast(struct decompose_pair_fast_ctx *ctx,
+                          int                            i,
+                          int                            j)
+{
+  uint64_t      t0 = 0;
+  unsigned char hc_decompose;
+  int           e, new_c, energy, stackEnergy, *cc, *cc1;
+
+  if (vrna_mfe_profile_enabled())
+    t0 = vrna_mfe_profile_now();
+
+  hc_decompose  = ctx->hc->mx[ctx->n * i + j];
+  cc            = ctx->cc;
+  cc1           = ctx->cc1;
+  e             = INF;
+
+  if (hc_decompose) {
+    new_c = INF;
+
+    energy  = vrna_eval_hairpin(ctx->fc, i, j, VRNA_EVAL_LOOP_DEFAULT);
+    new_c   = MIN2(new_c, energy);
+
+    energy  = vrna_mfe_multibranch_loop_fast(ctx->fc, i, j, ctx->ml_helpers);
+    new_c   = MIN2(new_c, energy);
+
+    if (ctx->dangle_model == 3) {
+      energy  = vrna_mfe_multibranch_loop_stack(ctx->fc, i, j);
+      new_c   = MIN2(new_c, energy);
+    }
+
+    energy  = vrna_mfe_internal(ctx->fc, i, j);
+    new_c   = MIN2(new_c, energy);
+
+    energy  = pair_multi_strand_fast_dimer(ctx, i, j);
+    new_c   = MIN2(new_c, energy);
+
+    if (ctx->noLP) {
+      stackEnergy  = vrna_eval_stack(ctx->fc, i, j, VRNA_EVAL_LOOP_DEFAULT);
+      new_c        = MIN2(new_c, cc1[j - 1] + stackEnergy);
+      cc[j]        = new_c;
+      e            = cc1[j - 1] + stackEnergy;
+    } else {
+      e = new_c;
+    }
+  }
+
+  if (vrna_mfe_profile_enabled())
+    vrna_mfe_profile_add_decompose_pair(vrna_mfe_profile_now() - t0);
+
+  return e;
+}
+
+
+PRIVATE INLINE int
 decompose_pair(vrna_fold_compound_t *fc,
                int                  i,
                int                  j,
                struct aux_arrays    *aux,
                struct ms_helpers    *ms_dat)
 {
+  uint64_t      t0 = 0;
   unsigned char hc_decompose;
   unsigned int  n;
   int           e, new_c, energy, stackEnergy, ij, dangle_model, noLP, *cc, *cc1;
+
+  if (vrna_mfe_profile_enabled())
+    t0 = vrna_mfe_profile_now();
 
   n             = fc->length;
   ij            = fc->jindx[j] + i;
@@ -4367,22 +5578,30 @@ decompose_pair(vrna_fold_compound_t *fc,
       e -= fc->pscore[ij];
   } /* end >> if (pair) << */
 
+  if (vrna_mfe_profile_enabled())
+    vrna_mfe_profile_add_decompose_pair(vrna_mfe_profile_now() - t0);
+
   return e;
 }
 
 
-PRIVATE INLINE struct aux_arrays *
-get_aux_arrays(unsigned int length)
+PRIVATE INLINE int
+pair_multi_strand_fast_dimer(struct decompose_pair_fast_ctx *ctx,
+                             int                            i,
+                             int                            j)
 {
-  struct aux_arrays *aux = (struct aux_arrays *)vrna_alloc(sizeof(struct aux_arrays));
+  return pair_multi_strand(ctx->fc, i, j, ctx->ms_dat);
+}
 
-  aux->cc   = (int *)vrna_alloc(sizeof(int) * (length + 2));    /* auxilary arrays for canonical structures     */
-  aux->cc1  = (int *)vrna_alloc(sizeof(int) * (length + 2));    /* auxilary arrays for canonical structures     */
 
-  /* get fast multiloop decomposition helpers */
-  aux->ml_helpers = vrna_mfe_multibranch_fast_init(length);
-
-  return aux;
+PRIVATE INLINE struct aux_arrays
+prepare_aux_arrays(vrna_mfe_scratch_t *scratch)
+{
+  return (struct aux_arrays){
+    .cc         = scratch->cc,
+    .cc1        = scratch->cc1,
+    .ml_helpers = scratch->ml_helpers
+  };
 }
 
 
@@ -4400,15 +5619,4 @@ rotate_aux_arrays(struct aux_arrays *aux,
     aux->cc[j] = INF;
 
   vrna_mfe_multibranch_fast_rotate(aux->ml_helpers);
-}
-
-
-PRIVATE INLINE void
-free_aux_arrays(struct aux_arrays *aux)
-{
-  free(aux->cc);
-  free(aux->cc1);
-  vrna_mfe_multibranch_fast_free(aux->ml_helpers);
-
-  free(aux);
 }

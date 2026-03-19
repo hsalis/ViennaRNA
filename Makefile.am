@@ -11,7 +11,7 @@ AM_DISTCHECK_CONFIGURE_FLAGS = \
 
 SUBDIRS = \
     src \
-    man \
+    @MAN_SUBDIR@ \
     misc \
     doc/doxygen \
     interfaces \

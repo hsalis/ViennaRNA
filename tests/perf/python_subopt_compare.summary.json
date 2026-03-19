@@ -1,0 +1,9 @@
+{
+  "task": "subopt",
+  "cases": 30,
+  "differences": 0,
+  "difference_ids": [],
+  "old_total_median_ns": 217122541,
+  "new_total_median_ns": 118142961,
+  "runtime_ratio": 0.544130335136415
+}

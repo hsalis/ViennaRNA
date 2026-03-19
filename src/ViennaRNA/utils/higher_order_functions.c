@@ -42,11 +42,29 @@ vrna_fun_zip_add_min_avx512(const int *e1,
 
 #endif
 
+#if VRNA_WITH_SIMD_AVX2
+extern int
+vrna_fun_zip_add_min_avx2(const int *e1,
+                          const int *e2,
+                          int       count);
+
+
+#endif
+
 #if VRNA_WITH_SIMD_SSE41
 extern int
 vrna_fun_zip_add_min_sse41(const int  *e1,
                            const int  *e2,
                            int        count);
+
+
+#endif
+
+#if VRNA_WITH_SIMD_NEON
+extern int
+vrna_fun_zip_add_min_neon(const int *e1,
+                          const int *e2,
+                          int       count);
 
 
 #endif
@@ -105,9 +123,25 @@ zip_add_min_dispatcher(const int  *a,
 
 #endif
 
+#if VRNA_WITH_SIMD_AVX2
+  if (features & VRNA_CPU_SIMD_AVX2) {
+    fun_zip_add_min = &vrna_fun_zip_add_min_avx2;
+    goto exec_fun_zip_add_min;
+  }
+
+#endif
+
 #if VRNA_WITH_SIMD_SSE41
   if (features & VRNA_CPU_SIMD_SSE41) {
     fun_zip_add_min = &vrna_fun_zip_add_min_sse41;
+    goto exec_fun_zip_add_min;
+  }
+
+#endif
+
+#if VRNA_WITH_SIMD_NEON
+  if (features & VRNA_CPU_SIMD_NEON) {
+    fun_zip_add_min = &vrna_fun_zip_add_min_neon;
     goto exec_fun_zip_add_min;
   }
 
