@@ -233,24 +233,7 @@ TESTS = \
       ${PYTHON2_TESTS} \
       ${PYTHON3_TESTS}
 
-noinst_PROGRAMS = \
-                  perf/rnafold_mfe_bench \
-                  perf/rnacofold_mfe_bench \
-                  perf/rnacofold_pf_bench \
-                  perf/rnaalifold_mfe_bench \
-                  perf/rnaalifold_pf_bench \
-                  perf/rnasubopt_bench \
-                  perf/rna_window_bench \
-                  perf/duplex_bench \
-                  perf/plex_bench \
-                  perf/heat_capacity_bench \
-                  perf/sampling_bench \
-                  perf/findpath_bench \
-                  perf/part_func_up_bench \
-                  perf/inverse_bench \
-                  perf/twoDfold_bench \
-                  perf/twoDpfold_bench \
-                  perf/vrna_api_compare_worker
+noinst_PROGRAMS =
 
 perf_rnafold_mfe_bench_SOURCES = perf/rnafold_mfe_bench.c
 perf_rnacofold_mfe_bench_SOURCES = perf/rnacofold_mfe_bench.c

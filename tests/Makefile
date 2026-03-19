@@ -99,24 +99,7 @@ am__append_2 = $(SVM_LIBS)
 TESTS = $(EXECUTABLE_TESTS) $(am__EXEEXT_1) \
 	$(PERL_TESTS) $(PYTHON2_TESTS) \
 	$(PYTHON3_TESTS)
-noinst_PROGRAMS =  \
-	perf/rnafold_mfe_bench$(EXEEXT) \
-	perf/rnacofold_mfe_bench$(EXEEXT) \
-	perf/rnacofold_pf_bench$(EXEEXT) \
-	perf/rnaalifold_mfe_bench$(EXEEXT) \
-	perf/rnaalifold_pf_bench$(EXEEXT) \
-	perf/rnasubopt_bench$(EXEEXT) \
-	perf/rna_window_bench$(EXEEXT) \
-	perf/duplex_bench$(EXEEXT) \
-	perf/plex_bench$(EXEEXT) \
-	perf/heat_capacity_bench$(EXEEXT) \
-	perf/sampling_bench$(EXEEXT) \
-	perf/findpath_bench$(EXEEXT) \
-	perf/part_func_up_bench$(EXEEXT) \
-	perf/inverse_bench$(EXEEXT) \
-	perf/twoDfold_bench$(EXEEXT) \
-	perf/twoDpfold_bench$(EXEEXT) \
-	perf/vrna_api_compare_worker$(EXEEXT)
+noinst_PROGRAMS =
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_rna.m4 \

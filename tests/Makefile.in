@@ -99,24 +99,7 @@ host_triplet = @host@
 @WITH_UNIT_TESTS_TRUE@TESTS = $(EXECUTABLE_TESTS) $(am__EXEEXT_1) \
 @WITH_UNIT_TESTS_TRUE@	$(PERL_TESTS) $(PYTHON2_TESTS) \
 @WITH_UNIT_TESTS_TRUE@	$(PYTHON3_TESTS)
-@WITH_UNIT_TESTS_TRUE@noinst_PROGRAMS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnafold_mfe_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rnacofold_mfe_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rnacofold_pf_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rnaalifold_mfe_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rnaalifold_pf_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rnasubopt_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/rna_window_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/duplex_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/plex_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/heat_capacity_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/sampling_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/findpath_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/part_func_up_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/inverse_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/twoDfold_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/twoDpfold_bench$(EXEEXT) \
-@WITH_UNIT_TESTS_TRUE@	perf/vrna_api_compare_worker$(EXEEXT)
+@WITH_UNIT_TESTS_TRUE@noinst_PROGRAMS =
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_rna.m4 \
