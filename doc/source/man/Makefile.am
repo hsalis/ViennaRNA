@@ -39,9 +39,12 @@ if WITH_REFERENCE_MANUAL
 
 endif WITH_REFERENCE_MANUAL
 
+BUILT_SOURCES =
+
+if WITH_REFERENCE_MANUAL_BUILD
 BUILT_SOURCES = $(REFMAN_MANPAGES)
+endif
 
 # remove all generated man pages
 maintainer-clean-local:
 	-rm -f $(REFMAN_MANPAGES)
-

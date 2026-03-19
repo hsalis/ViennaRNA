@@ -1,6 +1,10 @@
 include $(top_srcdir)/silent_rules.mk
 
-SUBDIRS = CLA source/man
+SUBDIRS = CLA
+
+if WITH_REFERENCE_MANUAL_BUILD
+SUBDIRS += source/man
+endif
 
 pkgdata_DATA = \
     viennarna.bib

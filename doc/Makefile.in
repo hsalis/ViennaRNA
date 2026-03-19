@@ -600,7 +600,8 @@ dmg_verbose_ = $(dmg_verbose_@AM_DEFAULT_V@)
 @WITH_COLOR_MAKE_TRUE@pkg_verbose_0 = @[ -t 1 ] && printf "  \033[1;34mPKG-GEN\033[0m  $@ || echo "  PKG-GEN  $@;
 @WITH_COLOR_MAKE_FALSE@dmg_verbose_0 = @echo "  DMG-GEN  $@;
 @WITH_COLOR_MAKE_TRUE@dmg_verbose_0 = @[ -t 1 ] && printf "  \033[1;34mDMG-GEN\033[0m  $@ || echo "  DMG-GEN  $@;
-SUBDIRS = CLA source/man
+SUBDIRS = CLA
+@WITH_REFERENCE_MANUAL_BUILD_TRUE@SUBDIRS += source/man
 pkgdata_DATA = \
     viennarna.bib
 
