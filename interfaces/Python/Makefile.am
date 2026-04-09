@@ -51,7 +51,14 @@ pkgpyvrnaexec_DATA = \
     ViennaRNA/__init__.py
 
 _RNA_la_SOURCES = $(INTERFACE_FILES) \
-                  $(SWIG_wrapper)
+                  $(SWIG_wrapper) \
+                  $(srcdir)/kinfold_api_wrapper.cpp \
+                  $(top_srcdir)/src/Kinfold/baum.c \
+                  $(top_srcdir)/src/Kinfold/cache.c \
+                  $(top_srcdir)/src/Kinfold/globals.c \
+                  $(top_srcdir)/src/Kinfold/nachbar.c \
+                  $(top_srcdir)/src/Kinfold/kinfold_api.c \
+                  $(top_srcdir)/src/Kinfold/cmdline.c
 
 EXTRA_DIST = \
   $(SWIG_wrapper) \

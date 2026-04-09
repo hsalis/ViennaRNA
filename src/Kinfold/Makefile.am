@@ -13,8 +13,8 @@ endif
 bin_PROGRAMS = Kinfold
 SUBDIRS = Example
 
-Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c \
-		  baum.h cache_util.h globals.h   nachbar.h \
+Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c kinfold_api.c \
+		  baum.h cache_util.h globals.h nachbar.h kinfold_api.h \
 		  cmdline.c cmdline.h
 
 

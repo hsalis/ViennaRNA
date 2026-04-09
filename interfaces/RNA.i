@@ -318,6 +318,7 @@ namespace std {
 %include walk.i
 %include paths.i
 %include heat_capacity.i
+%include kinfold.i
 %include fold_compound.i
 %include dp_matrices.i
 %include parameter_sets.i
@@ -349,4 +350,3 @@ struct bondT {
     return self+i;
   }
 }
-

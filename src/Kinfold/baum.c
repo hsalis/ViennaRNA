@@ -33,6 +33,12 @@
 #define SAME_STRAND(I,J) (((I)>=cut_point)||((J)<cut_point))
 #define ORDER(x,y) if ((x)->nummer>(y)->nummer) {tempb=x; x=y; y=tempb;}
 
+#ifdef __GNUC__
+# define INLINE inline
+#else
+# define INLINE
+#endif
+
 /* item of structure ringlist */
 typedef struct _baum {
   int nummer; /* number of base in sequence */
@@ -66,13 +72,24 @@ static void reset_ringlist(void);
 static void struc2tree (char *struc);
 static void close_bp_en (baum *i, baum *j);
 static void close_bp (baum *i, baum *j);
+static INLINE void close_bp_tmp (baum *i, baum *j);
 static void open_bp (baum *i);
+static INLINE void open_bp_tmp (baum *i);
 static void open_bp_en (baum *i);
 static void inb (baum *root);
 static void inb_nolp (baum *root);
 static void dnb (baum *rli);
 static void dnb_nolp (baum *rli);
 static void fnb (baum *rli);
+static int current_energy_dcal(void);
+static INLINE int position_blocked_by_bubble(int pos0);
+static INLINE int eval_loop_node(baum *node);
+static INLINE baum *find_parent_after_open(baum *node);
+static INLINE int eval_shift_move(int curr_dcal, baum *old_parent, baum *old_i, baum *new_i, baum *new_j);
+static int eval_double_insert_move(baum *root, baum *outer_i, baum *outer_j,
+                                   baum *inner_i, baum *inner_j, int curr_dcal);
+static int eval_double_delete_move(baum *outer_i, baum *outer_j,
+                                   baum *inner_i, baum *inner_j, int curr_dcal);
 static void make_ptypes(const short *S);
 /* debugging tool(s) */
 #if 0
@@ -111,8 +128,11 @@ static void struc2tree(char *struc) {
   }
 
 #if HAVE_LIBRNA_API3
+  GAV.vc->length = GSV.len;
+  pairList[0] = GSV.len;
   GSV.currE = GSV.startE = (float)vrna_eval_structure_pt(GAV.vc, pairList) / 100.0;
 #else
+  pairList[0] = GSV.len;
   GSV.currE = GSV.startE =
     (float )energy_of_struct_pt_par(GAV.farbe, pairList, typeList,
 				    aliasList, GAV.params, 0) / 100.0;
@@ -122,12 +142,16 @@ static void struc2tree(char *struc) {
     for(i = 0; i < GSV.len; i++) {
       if (pairList[i+1]>i+1)
 #if HAVE_LIBRNA_API3
+        GAV.vc->length = GSV.len;
+        pairList[0] = GSV.len;
         rl[i].loop_energy = vrna_eval_loop_pt(GAV.vc, i+1, pairList);
 #else
 	rl[i].loop_energy = loop_energy(pairList, typeList, aliasList,i+1);
 #endif
     }
 #if HAVE_LIBRNA_API3
+    GAV.vc->length = GSV.len;
+    pairList[0] = GSV.len;
     wurzl->loop_energy = vrna_eval_loop_pt(GAV.vc, 0, pairList);
 #else
     wurzl->loop_energy = loop_energy(pairList, typeList, aliasList,0);
@@ -139,20 +163,22 @@ static void struc2tree(char *struc) {
 
 /**/
 static void ini_ringlist(void) {
-  int i;
+  int i, capacity;
+
+  capacity = GSV.len;
 
   /* needed by function energy_of_struct_pt() from Vienna-RNA-1.4 */
-  pairList = (short *)calloc(GSV.len + 2, sizeof(short));
+  pairList = (short *)calloc(capacity + 2, sizeof(short));
   assert(pairList != NULL);
-  typeList = (short *)calloc(GSV.len + 2, sizeof(short));
+  typeList = (short *)calloc(capacity + 2, sizeof(short));
   assert(typeList != NULL);
-  aliasList = (short *)calloc(GSV.len + 2, sizeof(short));
+  aliasList = (short *)calloc(capacity + 2, sizeof(short));
   assert(aliasList != NULL);
   pairList[0] = typeList[0] = aliasList[0] = GSV.len;
-  ptype =  (char **)calloc(GSV.len + 2, sizeof(char *));
+  ptype =  (char **)calloc(capacity + 2, sizeof(char *));
   assert(ptype != NULL);
-  for (i=0; i<=GSV.len; i++) {
-    ptype[i] =   (char*)calloc(GSV.len + 2, sizeof(char));
+  for (i=0; i<=capacity; i++) {
+    ptype[i] =   (char*)calloc(capacity + 2, sizeof(char));
     assert(ptype[i] != NULL);
   }
 
@@ -160,7 +186,7 @@ static void ini_ringlist(void) {
   wurzl = (baum *)calloc(1, sizeof(baum));
   assert(wurzl != NULL);
   /* allocate ringList */
-  rl = (baum *)calloc(GSV.len+1, sizeof(baum));
+  rl = (baum *)calloc(capacity+1, sizeof(baum));
   assert(rl != NULL);
   /* allocate PostOrderList */
 
@@ -168,7 +194,7 @@ static void ini_ringlist(void) {
   wurzl->typ = 'r';
   wurzl->nummer = -1;
   /* connect virtualroot to ringlist-tree in down direction */
-  wurzl->down = &rl[GSV.len];
+  wurzl->down = &rl[capacity];
   /* initialize post-order list */
 
   make_pair_matrix();
@@ -377,6 +403,26 @@ void open_bp(baum *i) {
   i->down = in->prev->up = NULL;
 }
 
+/* open a particular base pair for temporary neighborhood evaluation */
+static INLINE void open_bp_tmp(baum *i) {
+
+  baum *in; /* points to i->next */
+
+  /* change pairtable representation */
+  pairList[1 + i->nummer] = 0;
+  pairList[1 + i->down->nummer] = 0;
+
+  /* change tree representation */
+  in = i->next;
+  i->typ = 'u';
+  i->down->typ = 'u';
+  i->next = i->down->next;
+  i->next->prev = i;
+  in->prev = i->down;
+  i->down->next = in;
+  i->down = in->prev->up = NULL;
+}
+
 /* close a particular base pair */
 void close_bp (baum *i, baum *j) {
 
@@ -388,6 +434,27 @@ void close_bp (baum *i, baum *j) {
 
   /* change pairtable representation */
   pairList[1 + i->nummer] = 1+ j->nummer;
+  pairList[1 + j->nummer] = 1 + i->nummer;
+
+  /* change tree representation */
+  jn = j->next;
+  i->typ = 'p';
+  j->typ = 'q';
+  i->down = j;
+  j->up = i;
+  i->next->prev = j;
+  j->next->prev = i;
+  j->next = i->next;
+  i->next = jn;
+}
+
+/* close a particular base pair for temporary neighborhood evaluation */
+static INLINE void close_bp_tmp (baum *i, baum *j) {
+
+  baum *jn; /* points to j->next */
+
+  /* change pairtable representation */
+  pairList[1 + i->nummer] = 1 + j->nummer;
   pairList[1 + j->nummer] = 1 + i->nummer;
 
   /* change tree representation */
@@ -433,25 +500,28 @@ static void make_poList (baum *root) {
 static void inb(baum *root) {
 
   int EoT;
-  int E_old, E_new_in, E_new_out;
+  int E_old, E_new_in, E_new_out, curr_dcal;
   baum *stop,*rli,*rlj;
 
-  E_old = root->loop_energy;
-  stop=root->down;
+  E_old     = root->loop_energy;
+  curr_dcal = current_energy_dcal();
+  stop      = root->down;
   /* loop ringlist over all possible i positions */
   for(rli=stop->next;rli!=stop;rli=rli->next){
     /* potential i-position is already paired */
     if(rli->typ=='p') continue;
+    if(position_blocked_by_bubble(rli->nummer)) continue;
     /* loop ringlist over all possible j positions */
     for(rlj=rli->next;rlj!=stop;rlj=rlj->next){
       /* base pair must enclose at least 3 bases */
       if(rlj->nummer - rli->nummer < MYTURN) continue;
       /* potential j-position is already paired */
       if(rlj->typ=='p') continue;
+      if(position_blocked_by_bubble(rlj->nummer)) continue;
       /* if i-j can form a base pair ... */
       if(ptype[rli->nummer][rlj->nummer]){
 	/* close the base bair and ... */
-	close_bp(rli,rlj);
+	close_bp_tmp(rli,rlj);
 #if HAVE_LIBRNA_API3
         E_new_in  = vrna_eval_loop_pt(GAV.vc, rli->nummer+1, pairList);
         E_new_out = vrna_eval_loop_pt(GAV.vc, root->nummer+1, pairList);
@@ -460,10 +530,10 @@ static void inb(baum *root) {
 	E_new_out = loop_energy(pairList, typeList, aliasList,root->nummer+1);
 #endif
 	/* ... evaluate energy of the structure */
-	EoT = (int) (GSV.currE*100 + ((GSV.currE<0)?-0.4:0.4)) +  E_new_in + E_new_out - E_old ;
+	EoT = curr_dcal + E_new_in + E_new_out - E_old;
 	/* assert(EoT ==  energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params)); */
 	/* open the base pair again... */
-	open_bp(rli);
+	open_bp_tmp(rli);
 	/* ... and put the move and the enegy
 	   of the structure into the neighbour list */
 	update_nbList(1 + rli->nummer, 1 + rlj->nummer, EoT);
@@ -477,34 +547,42 @@ static void inb(baum *root) {
 static void inb_nolp(baum *root) {
 
   int EoT = 0;
+  int E_old, E_new_in, E_new_out, curr_dcal;
   baum *stop, *rli, *rlj;
 
-  stop = root->down;
+  stop      = root->down;
+  E_old     = root->loop_energy;
+  curr_dcal = current_energy_dcal();
     /* loop ringlist over all possible i positions */
   for (rli=stop->next;rli!=stop;rli=rli->next) {
     /* potential i-position is already paired */
     if (rli->typ=='p') continue;
+    if (position_blocked_by_bubble(rli->nummer)) continue;
     /* loop ringlist over all possible j positions */
     for (rlj=rli->next;rlj!=stop;rlj=rlj->next) {
       /* base pair must enclose at least 3 bases */
       if (rlj->nummer - rli->nummer < MYTURN) continue;
       /* potential j-position is already paired */
       if (rlj->typ=='p') continue;
+      if (position_blocked_by_bubble(rlj->nummer)) continue;
       /* if i-j can form a base pair ... */
       if (ptype[rli->nummer][rlj->nummer]) {
 	/* ... and extends a helix ... */
 	if (((rli->prev==stop && rlj->next==stop) && stop->typ != 'x') ||
 	    (rli->next == rlj->prev)) {
 	  /* ... close the base bair and ... */
-	  close_bp(rli,rlj);
+	  close_bp_tmp(rli,rlj);
 	  /* ... evaluate energy of the structure */
 #if HAVE_LIBRNA_API3
-	  EoT = vrna_eval_structure_pt(GAV.vc, pairList);
+	  E_new_in  = vrna_eval_loop_pt(GAV.vc, rli->nummer + 1, pairList);
+	  E_new_out = vrna_eval_loop_pt(GAV.vc, root->nummer + 1, pairList);
 #else
-	  EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
+	  E_new_in  = loop_energy(pairList, typeList, aliasList, rli->nummer + 1);
+	  E_new_out = loop_energy(pairList, typeList, aliasList, root->nummer + 1);
 #endif
+	  EoT = curr_dcal + E_new_in + E_new_out - E_old;
 	  /* open the base pair again... */
-	  open_bp(rli);
+	  open_bp_tmp(rli);
 	  /* ... and put the move and the enegy
 	     of the structure into the neighbour list */
 	  update_nbList(1 + rli->nummer, 1 + rlj->nummer, EoT);
@@ -514,18 +592,7 @@ static void inb_nolp(baum *root) {
 		 (rli->next->typ != 'p' && rlj->prev->typ != 'p') &&
 		 (rli->next->next != rlj->prev->prev) &&
 		 (ptype[rli->next->nummer][rlj->prev->nummer])) {
-	  /* close the two base bair and ... */
-	  close_bp(rli->next, rlj->prev);
-	  close_bp(rli, rlj);
-	  /* ... evaluate energy of the structure */
-#if HAVE_LIBRNA_API3
-	  EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-	  EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
-	  /* open the two base pair again ... */
-	  open_bp(rli);
-	  open_bp(rli->next);
+	  EoT = eval_double_insert_move(root, rli, rlj, rli->next, rlj->prev, curr_dcal);
 	  /* ... and put the move and the enegy
 	     of the structure into the neighbour list */
 	  update_nbList(1+rli->nummer+GSV.len+1, 1+rlj->nummer+GSV.len+1, EoT);
@@ -539,14 +606,13 @@ static void inb_nolp(baum *root) {
  with one less base pair */
 static void dnb(baum *rli){
 
-  int EoT, E_old_in, E_old_out, E_new;
-
+  int EoT, E_old_in, E_old_out, E_new, curr_dcal;
   baum *rlj, *r;
 
-  rlj=rli->down;
-  open_bp(rli);
+  rlj = rli->down;
+  curr_dcal = current_energy_dcal();
+  open_bp_tmp(rli);
   /* ... evaluate energy of the structure */
-
   for (r=rli->next; r->up==NULL; r=r->next);
   E_old_in = rli->loop_energy;
   E_old_out = r->up->loop_energy;
@@ -555,11 +621,10 @@ static void dnb(baum *rli){
 #else
   E_new = loop_energy(pairList,typeList,aliasList,r->up->nummer+1);
 #endif
-  EoT = (int) (GSV.currE*100 + ((GSV.currE<0)?-0.4:0.4)) -
-    E_old_in - E_old_out + E_new;
+  EoT = curr_dcal - E_old_in - E_old_out + E_new;
 
   /* assert(EoT== energy_of_struct_pt(GAV.farbe, pairList, typeList, aliasList));*/
-  close_bp(rli,rlj);
+  close_bp_tmp(rli,rlj);
   update_nbList(-(1 + rli->nummer), -(1 + rlj->nummer), EoT);
 }
 
@@ -568,6 +633,7 @@ static void dnb(baum *rli){
 static void dnb_nolp(baum *rli) {
 
   int EoT = 0;
+  int E_old_in, E_old_out, E_new, curr_dcal;
   baum *rlj;
   baum *rlin = NULL; /* pointers to following pair in helix, if any */
   baum *rljn = NULL;
@@ -575,7 +641,7 @@ static void dnb_nolp(baum *rli) {
   baum *rljp = NULL;
 
   rlj = rli->down;
-
+  curr_dcal = current_energy_dcal();
   /* immediate interior base pair ? */
   if (rlj->next == rlj->prev) {
     rlin = rlj->next;
@@ -590,38 +656,32 @@ static void dnb_nolp(baum *rli) {
 
   /* double delete ? */
   if (rlip==NULL && rlin && rljn->next != rljn->prev ) {
-    /* open the two base pairs ... */
-    open_bp(rli);
-    open_bp(rlin);
-    /* ... evaluate energy of the structure ... */
-#if HAVE_LIBRNA_API3
-    EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-    EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
+    EoT = eval_double_delete_move(rli, rlj, rlin, rljn, curr_dcal);
     /* ... and put the move and the enegy
        of the structure into the neighbour list ... */
     update_nbList(-(1+rli->nummer+GSV.len+1),-(1+rlj->nummer+GSV.len+1), EoT);
-    /* ... and close the two base pairs again */
-    close_bp(rlin, rljn);
-    close_bp(rli, rlj);
   } else { /* single delete */
     /* the following will work only if boolean expr are shortcicuited */
     if (rlip==NULL || (rlip->prev == rlip->next && rlip->prev->typ != 'x'))
       if (rlin ==NULL || (rljn->next == rljn->prev)) {
+	baum *r;
+	E_old_in = rli->loop_energy;
 	/* open the base pair ... */
-	open_bp(rli);
+	open_bp_tmp(rli);
 	/* ... evaluate energy of the structure ... */
+	for (r = rli->next; r->up == NULL; r = r->next);
+	E_old_out = r->up->loop_energy;
 #if HAVE_LIBRNA_API3
-	EoT = vrna_eval_structure_pt(GAV.vc, pairList);
+	E_new = vrna_eval_loop_pt(GAV.vc, r->up->nummer + 1, pairList);
 #else
-	EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
+	E_new = loop_energy(pairList, typeList, aliasList, r->up->nummer + 1);
 #endif
+	EoT = curr_dcal - E_old_in - E_old_out + E_new;
 	/* ... and put the move and the enegy
 	   of the structure into the neighbour list ... */
 	update_nbList(-(1 + rli->nummer),-(1 + rlj->nummer), EoT);
 	/* and close the base pair again */
-	close_bp(rli, rlj);
+	close_bp_tmp(rli, rlj);
       }
   }
 }
@@ -630,61 +690,41 @@ static void dnb_nolp(baum *rli) {
  with one shifted base pair */
 static void fnb(baum *rli) {
 
-  int EoT = 0, x;
-  baum *rlj, *stop, *help_rli, *help_rlj;
+  int EoT = 0, x, curr_dcal;
+  baum *rlj, *stop, *help_rli, *help_rlj, *old_parent;
 
   stop = rli->down;
+  curr_dcal = current_energy_dcal();
+  open_bp_tmp(rli);
+  old_parent = find_parent_after_open(rli);
+  close_bp_tmp(rli, stop);
 
   /* examin interior loop of bp(ij); (.......)
      i of j move                      ->   <- */
   for (rlj = stop->next; rlj != stop; rlj = rlj->next) {
     /* prevent shifting to paired position */
     if ((rlj->typ=='p')||(rlj->typ=='q')) continue;
+    if (position_blocked_by_bubble(rlj->nummer)) continue;
     /* j-position of base pair shifts to k position (ij)->(ik) i<k<j */
     if ( (rlj->nummer-rli->nummer >= MYTURN)
 	 && (ptype[rli->nummer][rlj->nummer]) ) {
-      /* open original basepair */
-      open_bp(rli);
-      /* close shifted version of original basepair */
-      close_bp(rli, rlj);
-      /* evaluate energy of the structure */
-#if HAVE_LIBRNA_API3
-      EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-      EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
+      EoT = eval_shift_move(curr_dcal, old_parent, rli, rli, rlj);
       /* put the move and the enegy of the structure into the neighbour list */
       update_nbList(1+rli->nummer, -(1+rlj->nummer), EoT);
-      /* open shifted basepair */
-      open_bp(rli);
-      /* restore original basepair */
-      close_bp(rli, stop);
     }
     /* i-position of base pair shifts to position k (ij)->(kj) i<k<j */
     if ( (stop->nummer-rlj->nummer >= MYTURN)
 	 && (ptype[stop->nummer][rlj->nummer]) ) {
-      /* open original basepair */
-      open_bp(rli);
-      /* close shifted version of original basepair */
-      close_bp(rlj, stop);
-      /* evaluate energy of the structure */
-#if HAVE_LIBRNA_API3
-      EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-      EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
+      EoT = eval_shift_move(curr_dcal, old_parent, rli, rlj, stop);
       /* put the move and the enegy of the structure into the neighbour list */
       update_nbList(-(1 + rlj->nummer), 1 + stop->nummer, EoT);
-      /* open shifted basepair */
-      open_bp(rlj);
-      /* restore original basepair */
-      close_bp(rli, stop);
     }
   }
   /* examin exterior loop of bp(ij);   (.......)
      i or j moves                    <-         -> */
   for (rlj=rli->next;rlj!=rli;rlj=rlj->next) {
     if ((rlj->typ=='p') || (rlj->typ=='q' ) || (rlj->typ=='x')) continue;
+    if (position_blocked_by_bubble(rlj->nummer)) continue;
     x=rlj->nummer-rli->nummer;
     if (x<0) x=-x;
     /* j-position of base pair shifts to position k */
@@ -697,22 +737,9 @@ static void fnb(baum *rli) {
 	help_rli=rlj;
 	help_rlj=rli;
       }
-      /* open original basepair */
-      open_bp(rli);
-      /* close shifted version of original basepair */
-      close_bp(help_rli,help_rlj);
-      /* evaluate energy of the structure */
-#if HAVE_LIBRNA_API3
-      EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-      EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
+      EoT = eval_shift_move(curr_dcal, old_parent, rli, help_rli, help_rlj);
       /* put the move and the enegy of the structure into the neighbour list */
       update_nbList(1 + rli->nummer, -(1 + rlj->nummer), EoT);
-      /* open shifted base pair */
-      open_bp(help_rli);
-      /* restore original basepair */
-      close_bp(rli,stop);
     }
     x = rlj->nummer-stop->nummer;
     if (x < 0) x = -x;
@@ -726,22 +753,9 @@ static void fnb(baum *rli) {
 	help_rli = rlj;
 	help_rlj = stop;
       }
-      /* open original basepair */
-      open_bp(rli);
-       /* close shifted version of original basepair */
-      close_bp(help_rli, help_rlj);
-      /* evaluate energy of the structure */
-#if HAVE_LIBRNA_API3
-      EoT = vrna_eval_structure_pt(GAV.vc, pairList);
-#else
-      EoT = energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0);
-#endif
+      EoT = eval_shift_move(curr_dcal, old_parent, rli, help_rli, help_rlj);
       /* put the move and the enegy of the structure into the neighbour list */
       update_nbList(-(1 + rlj->nummer), 1 + stop->nummer, EoT);
-      /* open shifted basepair */
-      open_bp(help_rli);
-      /* restore original basepair */
-      close_bp(rli,stop);
     }
   }
 }
@@ -750,14 +764,7 @@ static void fnb(baum *rli) {
    generate all neighbours according to moveset */
 void move_it (void) {
   int i;
-  
-#if HAVE_LIBRNA_API3
-  GSV.currE = (float)vrna_eval_structure_pt(GAV.vc, pairList)/100.;
-#else
-  GSV.currE =
-    energy_of_struct_pt_par(GAV.farbe, pairList, typeList, aliasList, GAV.params, 0)/100.;
-#endif
-  
+
   if ( GTV.noLP ) { /* canonical neighbours only */
     inb_nolp(wurzl);
     for (i = 0; i < GSV.len; i++) {
@@ -880,3 +887,157 @@ static void open_bp_en (baum *i) {
   r->up->loop_energy = loop_energy(pairList,typeList,aliasList,r->up->nummer+1);
 #endif
 };
+
+static int current_energy_dcal(void) {
+  return (int)(GSV.currE * 100 + ((GSV.currE < 0) ? -0.4 : 0.4));
+}
+
+void kinfold_rebuild_current_state(void) {
+  float saved_startE;
+
+  saved_startE = GSV.startE;
+  if (wurzl != NULL)
+    clean_up_rl();
+
+  ini_ringlist();
+  struc2tree(GAV.currform);
+  GSV.startE = saved_startE;
+}
+
+int kinfold_can_pair_positions(int i, int j) {
+  if ((i < 0) || (j < 0) || (i >= GSV.len) || (j >= GSV.len))
+    return 0;
+  if (position_blocked_by_bubble(i) || position_blocked_by_bubble(j))
+    return 0;
+  if (abs(j - i) < MYTURN)
+    return 0;
+
+  return ptype[i][j] ? 1 : 0;
+}
+
+int kinfold_can_pair_positions_raw(int i, int j) {
+  if ((i < 0) || (j < 0) || (i >= GSV.len) || (j >= GSV.len))
+    return 0;
+  if (abs(j - i) < MYTURN)
+    return 0;
+
+  return ptype[i][j] ? 1 : 0;
+}
+
+int kinfold_is_unpaired_position(int i) {
+  if ((i < 0) || (i >= GSV.len))
+    return 0;
+
+  return pairList[i + 1] == 0;
+}
+
+int kinfold_eval_structure_dcal(const char *structure) {
+#if HAVE_LIBRNA_API3
+  float e;
+  GAV.vc->length = GSV.len;
+  e = vrna_eval_structure(GAV.vc, structure);
+  return (int)(e * 100.0 + ((e < 0.0) ? -0.4 : 0.4));
+#else
+  {
+    float e;
+    e = energy_of_structure(GAV.farbe, (char *)structure, 0);
+    return (int)(e * 100.0 + ((e < 0.0) ? -0.4 : 0.4));
+  }
+#endif
+}
+
+static INLINE int position_blocked_by_bubble(int pos0) {
+  return kinfold_bubble_enabled() &&
+         (pos0 >= GSV.bubble_left) &&
+         (pos0 < GSV.len);
+}
+
+static INLINE int eval_loop_node(baum *node) {
+#if HAVE_LIBRNA_API3
+  GAV.vc->length = GSV.len;
+  pairList[0] = GSV.len;
+  return vrna_eval_loop_pt(GAV.vc, node->nummer + 1, pairList);
+#else
+  return loop_energy(pairList, typeList, aliasList, node->nummer + 1);
+#endif
+}
+
+static INLINE baum *find_parent_after_open(baum *node) {
+  baum *r;
+
+  for (r = node->next; r->up == NULL; r = r->next);
+
+  return r->up;
+}
+
+static INLINE int eval_shift_move(int curr_dcal,
+                                  baum *old_parent,
+                                  baum *old_i,
+                                  baum *new_i,
+                                  baum *new_j) {
+  baum *old_j;
+  int  old_in, old_out, new_in, new_out;
+
+  old_j   = old_i->down;
+  old_in  = old_i->loop_energy;
+  old_out = old_parent->loop_energy;
+
+  open_bp_tmp(old_i);
+
+  close_bp_tmp(new_i, new_j);
+
+  new_in  = eval_loop_node(new_i);
+  new_out = eval_loop_node(old_parent);
+
+  open_bp_tmp(new_i);
+  close_bp_tmp(old_i, old_j);
+
+  return curr_dcal - old_in - old_out + new_in + new_out;
+}
+
+static int eval_double_insert_move(baum *root,
+                                   baum *outer_i,
+                                   baum *outer_j,
+                                   baum *inner_i,
+                                   baum *inner_j,
+                                   int curr_dcal) {
+  int old_root, new_root, new_outer, new_inner;
+
+  old_root = root->loop_energy;
+
+  close_bp_tmp(inner_i, inner_j);
+  close_bp_tmp(outer_i, outer_j);
+
+  new_inner = eval_loop_node(inner_i);
+  new_outer = eval_loop_node(outer_i);
+  new_root  = eval_loop_node(root);
+
+  open_bp_tmp(outer_i);
+  open_bp_tmp(inner_i);
+
+  return curr_dcal - old_root + new_root + new_outer + new_inner;
+}
+
+static int eval_double_delete_move(baum *outer_i,
+                                   baum *outer_j,
+                                   baum *inner_i,
+                                   baum *inner_j,
+                                   int curr_dcal) {
+  baum *r;
+  int  old_outer, old_inner, old_parent, new_parent;
+
+  old_outer = outer_i->loop_energy;
+  old_inner = inner_i->loop_energy;
+
+  open_bp_tmp(outer_i);
+  open_bp_tmp(inner_i);
+
+  for (r = outer_i->next; r->up == NULL; r = r->next);
+  old_parent = r->up->loop_energy;
+  new_parent = eval_loop_node(r->up);
+
+  close_bp_tmp(inner_i, inner_j);
+  close_bp_tmp(outer_i, outer_j);
+
+  return curr_dcal - old_outer - old_inner - old_parent + new_parent;
+}

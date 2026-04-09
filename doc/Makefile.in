@@ -90,6 +90,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@WITH_REFERENCE_MANUAL_BUILD_TRUE@am__append_1 = source/man
 subdir = doc
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_rna.m4 \
@@ -206,7 +207,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = $(SUBDIRS)
+DIST_SUBDIRS = CLA source/man
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/conf.py.in \
 	$(top_srcdir)/silent_rules.mk
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -600,8 +601,7 @@ dmg_verbose_ = $(dmg_verbose_@AM_DEFAULT_V@)
 @WITH_COLOR_MAKE_TRUE@pkg_verbose_0 = @[ -t 1 ] && printf "  \033[1;34mPKG-GEN\033[0m  $@ || echo "  PKG-GEN  $@;
 @WITH_COLOR_MAKE_FALSE@dmg_verbose_0 = @echo "  DMG-GEN  $@;
 @WITH_COLOR_MAKE_TRUE@dmg_verbose_0 = @[ -t 1 ] && printf "  \033[1;34mDMG-GEN\033[0m  $@ || echo "  DMG-GEN  $@;
-SUBDIRS = CLA
-@WITH_REFERENCE_MANUAL_BUILD_TRUE@SUBDIRS += source/man
+SUBDIRS = CLA $(am__append_1)
 pkgdata_DATA = \
     viennarna.bib
 

@@ -33,36 +33,41 @@ const char *gengetopt_args_info_versiontext = "";
 const char *gengetopt_args_info_description = "";
 
 const char *gengetopt_args_info_full_help[] = {
-  "  -h, --help            Print help and exit",
-  "      --full-help       Print help, including hidden options, and exit",
-  "  -V, --version         Print version and exit",
+  "  -h, --help                    Print help and exit",
+  "      --full-help               Print help, including hidden options, and exit",
+  "  -V, --version                 Print version and exit",
   "\nEnergy Model:",
-  "  -d, --dangle=INT      <0|1|2> set dangling end model to (none|normal|double)\n                          (possible values=\"0\", \"1\", \"2\" default=`2')",
-  "  -T, --Temp=FLOAT      simulation temperature  (default=`37')",
-  "  -P, --Par=filename    read energy-parameter-file",
-  "      --logML           use logarithmic multiloop energies instead of linear\n                          (default=on)",
+  "  -d, --dangle=INT              <0|1|2> set dangling end model to\n                                  (none|normal|double)  (possible values=\"0\",\n                                  \"1\", \"2\" default=`2')",
+  "  -T, --Temp=FLOAT              simulation temperature  (default=`37')",
+  "  -P, --Par=filename            read energy-parameter-file",
+  "      --logML                   use logarithmic multiloop energies instead of\n                                  linear  (default=on)",
   "\nMoveSet:",
-  "      --noShift         turn off shift-moves  (default=off)",
-  "      --noLP            forbid structures with isolated base-pairs\n                          (default=off)",
+  "      --noShift                 turn off shift-moves  (default=off)",
+  "      --noLP                    forbid structures with isolated base-pairs\n                                  (default=off)",
   "\nSimulation:",
-  "      --seed=STRING     set random number seed specify 3 integers as\n                          int=int=int  (default=`clock')",
-  "      --time=FLOAT      set maxtime of simulation  (default=`500')",
-  "      --num=INT         set number of trajectories  (default=`1')",
-  "      --start           read start structure from stdin (otherwise use open\n                          chain)  (default=off)",
-  "      --stop            read stop structure(s) from stdin (otherwise use MFE)\n                          (default=off)",
-  "      --met             use Metropolis rule for rates (not Kawasaki rule)\n                          (default=off)",
-  "      --fpt             compute first passage time (stop when a stop-structure\n                          is reached)  (default=on)",
-  "      --rect            compute recurrence time (of a start structure which is\n                          contained in stop structures)  (default=off)",
-  "      --grow=FLOAT      grow chain every <float> time units  (default=`0')",
-  "      --glen=INT        initial size of growing chain  (default=`15')",
-  "      --phi=DOUBLE      set phi value",
-  "      --pbounds=STRING  specify 3 floats for phi_min, phi_inc, phi_max in the\n                          form <d1=d2=d3>",
+  "      --seed=STRING             set random number seed specify 3 integers as\n                                  int=int=int  (default=`clock')",
+  "      --time=FLOAT              set maxtime of simulation  (default=`500')",
+  "      --time-step=DOUBLE        save/output trajectory state every <float>\n                                  seconds  (default=`1.0')",
+  "      --num=INT                 set number of trajectories  (default=`1')",
+  "      --start                   read start structure from stdin (otherwise use\n                                  open chain)  (default=off)",
+  "      --stop                    read stop structure(s) from stdin (otherwise\n                                  use MFE)  (default=off)",
+  "      --met                     use Metropolis rule for rates (not Kawasaki\n                                  rule)  (default=off)",
+  "      --fpt                     compute first passage time (stop when a\n                                  stop-structure is reached)  (default=on)",
+  "      --rect                    compute recurrence time (of a start structure\n                                  which is contained in stop structures)\n                                  (default=off)",
+  "      --grow=FLOAT              deprecated compatibility alias for\n                                  transcription elongation  (default=`0')",
+  "      --glen=INT                initial size of growing chain  (default=`15')",
+  "      --transcription_elongation_rate=DOUBLE\n                                set transcription elongation rate in\n                                  nucleotides per second  (default=`0')",
+  "      --kinfold_seconds_per_time_unit=DOUBLE\n                                set physical seconds represented by one Kinfold\n                                  time unit  (default=`1e-5')",
+  "      --max_bubble_width=INT    set maximum transcription bubble width in\n                                  nucleotides  (default=`0')",
+  "      --dump_transcription_neighbors\n                                debug: dump transcription/bubble neighbor sets\n                                  to stderr  (default=off)",
+  "      --phi=DOUBLE              set phi value",
+  "      --pbounds=STRING          specify 3 floats for phi_min, phi_inc, phi_max\n                                  in the form <d1=d2=d3>",
   "\nOutput:",
-  "      --log=filename    set basename of log-file  (default=`kinout')",
-  "  -q, --silent          no output to stdout  (default=off)",
-  "  -v, --verbose         more information to stdout  (default=off)",
-  "      --lmin            output only local minima to stdout  (default=off)",
-  "      --cut=FLOAT       only print structures with E <= MFE + <float> to stdout\n                          (default=`20')",
+  "      --log=filename            set basename of log-file  (default=`kinout')",
+  "  -q, --silent                  no output to stdout  (default=off)",
+  "  -v, --verbose                 more information to stdout  (default=off)",
+  "      --lmin                    output only local minima to stdout\n                                  (default=off)",
+  "      --cut=FLOAT               only print structures with E <= MFE + <float>\n                                  to stdout (default: no cutoff)  (default=`0')",
   "Input File Format:\n  1st line sequence\n  2nd line start structure (if option --start is used)\n  following lines are stop structures (if option --stop is used)",
     0
 };
@@ -91,19 +96,22 @@ init_help_array(void)
   gengetopt_args_info_help[18] = gengetopt_args_info_full_help[18];
   gengetopt_args_info_help[19] = gengetopt_args_info_full_help[19];
   gengetopt_args_info_help[20] = gengetopt_args_info_full_help[20];
-  gengetopt_args_info_help[21] = gengetopt_args_info_full_help[21];
-  gengetopt_args_info_help[22] = gengetopt_args_info_full_help[24];
-  gengetopt_args_info_help[23] = gengetopt_args_info_full_help[25];
-  gengetopt_args_info_help[24] = gengetopt_args_info_full_help[26];
-  gengetopt_args_info_help[25] = gengetopt_args_info_full_help[27];
-  gengetopt_args_info_help[26] = gengetopt_args_info_full_help[28];
-  gengetopt_args_info_help[27] = gengetopt_args_info_full_help[29];
-  gengetopt_args_info_help[28] = gengetopt_args_info_full_help[30];
-  gengetopt_args_info_help[29] = 0; 
+  gengetopt_args_info_help[21] = gengetopt_args_info_full_help[22];
+  gengetopt_args_info_help[22] = gengetopt_args_info_full_help[23];
+  gengetopt_args_info_help[23] = gengetopt_args_info_full_help[24];
+  gengetopt_args_info_help[24] = gengetopt_args_info_full_help[25];
+  gengetopt_args_info_help[25] = gengetopt_args_info_full_help[29];
+  gengetopt_args_info_help[26] = gengetopt_args_info_full_help[30];
+  gengetopt_args_info_help[27] = gengetopt_args_info_full_help[31];
+  gengetopt_args_info_help[28] = gengetopt_args_info_full_help[32];
+  gengetopt_args_info_help[29] = gengetopt_args_info_full_help[33];
+  gengetopt_args_info_help[30] = gengetopt_args_info_full_help[34];
+  gengetopt_args_info_help[31] = gengetopt_args_info_full_help[35];
+  gengetopt_args_info_help[32] = 0; 
   
 }
 
-const char *gengetopt_args_info_help[30];
+const char *gengetopt_args_info_help[33];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -142,6 +150,7 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->noLP_given = 0 ;
   args_info->seed_given = 0 ;
   args_info->time_given = 0 ;
+  args_info->time_step_given = 0 ;
   args_info->num_given = 0 ;
   args_info->start_given = 0 ;
   args_info->stop_given = 0 ;
@@ -150,6 +159,10 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->rect_given = 0 ;
   args_info->grow_given = 0 ;
   args_info->glen_given = 0 ;
+  args_info->transcription_elongation_rate_given = 0 ;
+  args_info->kinfold_seconds_per_time_unit_given = 0 ;
+  args_info->max_bubble_width_given = 0 ;
+  args_info->dump_transcription_neighbors_given = 0 ;
   args_info->phi_given = 0 ;
   args_info->pbounds_given = 0 ;
   args_info->log_given = 0 ;
@@ -176,6 +189,8 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->seed_orig = NULL;
   args_info->time_arg = 500;
   args_info->time_orig = NULL;
+  args_info->time_step_arg = 1.0;
+  args_info->time_step_orig = NULL;
   args_info->num_arg = 1;
   args_info->num_orig = NULL;
   args_info->start_flag = 0;
@@ -187,6 +202,13 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->grow_orig = NULL;
   args_info->glen_arg = 15;
   args_info->glen_orig = NULL;
+  args_info->transcription_elongation_rate_arg = 0;
+  args_info->transcription_elongation_rate_orig = NULL;
+  args_info->kinfold_seconds_per_time_unit_arg = 1e-5;
+  args_info->kinfold_seconds_per_time_unit_orig = NULL;
+  args_info->max_bubble_width_arg = 0;
+  args_info->max_bubble_width_orig = NULL;
+  args_info->dump_transcription_neighbors_flag = 0;
   args_info->phi_orig = NULL;
   args_info->pbounds_arg = NULL;
   args_info->pbounds_orig = NULL;
@@ -195,7 +217,7 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->silent_flag = 0;
   args_info->verbose_flag = 0;
   args_info->lmin_flag = 0;
-  args_info->cut_arg = 20;
+  args_info->cut_arg = 0;
   args_info->cut_orig = NULL;
   
 }
@@ -216,21 +238,26 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->noLP_help = gengetopt_args_info_full_help[10] ;
   args_info->seed_help = gengetopt_args_info_full_help[12] ;
   args_info->time_help = gengetopt_args_info_full_help[13] ;
-  args_info->num_help = gengetopt_args_info_full_help[14] ;
-  args_info->start_help = gengetopt_args_info_full_help[15] ;
-  args_info->stop_help = gengetopt_args_info_full_help[16] ;
-  args_info->met_help = gengetopt_args_info_full_help[17] ;
-  args_info->fpt_help = gengetopt_args_info_full_help[18] ;
-  args_info->rect_help = gengetopt_args_info_full_help[19] ;
-  args_info->grow_help = gengetopt_args_info_full_help[20] ;
-  args_info->glen_help = gengetopt_args_info_full_help[21] ;
-  args_info->phi_help = gengetopt_args_info_full_help[22] ;
-  args_info->pbounds_help = gengetopt_args_info_full_help[23] ;
-  args_info->log_help = gengetopt_args_info_full_help[25] ;
-  args_info->silent_help = gengetopt_args_info_full_help[26] ;
-  args_info->verbose_help = gengetopt_args_info_full_help[27] ;
-  args_info->lmin_help = gengetopt_args_info_full_help[28] ;
-  args_info->cut_help = gengetopt_args_info_full_help[29] ;
+  args_info->time_step_help = gengetopt_args_info_full_help[14] ;
+  args_info->num_help = gengetopt_args_info_full_help[15] ;
+  args_info->start_help = gengetopt_args_info_full_help[16] ;
+  args_info->stop_help = gengetopt_args_info_full_help[17] ;
+  args_info->met_help = gengetopt_args_info_full_help[18] ;
+  args_info->fpt_help = gengetopt_args_info_full_help[19] ;
+  args_info->rect_help = gengetopt_args_info_full_help[20] ;
+  args_info->grow_help = gengetopt_args_info_full_help[21] ;
+  args_info->glen_help = gengetopt_args_info_full_help[22] ;
+  args_info->transcription_elongation_rate_help = gengetopt_args_info_full_help[23] ;
+  args_info->kinfold_seconds_per_time_unit_help = gengetopt_args_info_full_help[24] ;
+  args_info->max_bubble_width_help = gengetopt_args_info_full_help[25] ;
+  args_info->dump_transcription_neighbors_help = gengetopt_args_info_full_help[26] ;
+  args_info->phi_help = gengetopt_args_info_full_help[27] ;
+  args_info->pbounds_help = gengetopt_args_info_full_help[28] ;
+  args_info->log_help = gengetopt_args_info_full_help[30] ;
+  args_info->silent_help = gengetopt_args_info_full_help[31] ;
+  args_info->verbose_help = gengetopt_args_info_full_help[32] ;
+  args_info->lmin_help = gengetopt_args_info_full_help[33] ;
+  args_info->cut_help = gengetopt_args_info_full_help[34] ;
   
 }
 
@@ -336,9 +363,13 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->seed_arg));
   free_string_field (&(args_info->seed_orig));
   free_string_field (&(args_info->time_orig));
+  free_string_field (&(args_info->time_step_orig));
   free_string_field (&(args_info->num_orig));
   free_string_field (&(args_info->grow_orig));
   free_string_field (&(args_info->glen_orig));
+  free_string_field (&(args_info->transcription_elongation_rate_orig));
+  free_string_field (&(args_info->kinfold_seconds_per_time_unit_orig));
+  free_string_field (&(args_info->max_bubble_width_orig));
   free_string_field (&(args_info->phi_orig));
   free_string_field (&(args_info->pbounds_arg));
   free_string_field (&(args_info->pbounds_orig));
@@ -438,6 +469,8 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "seed", args_info->seed_orig, 0);
   if (args_info->time_given)
     write_into_file(outfile, "time", args_info->time_orig, 0);
+  if (args_info->time_step_given)
+    write_into_file(outfile, "time-step", args_info->time_step_orig, 0);
   if (args_info->num_given)
     write_into_file(outfile, "num", args_info->num_orig, 0);
   if (args_info->start_given)
@@ -454,6 +487,14 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "grow", args_info->grow_orig, 0);
   if (args_info->glen_given)
     write_into_file(outfile, "glen", args_info->glen_orig, 0);
+  if (args_info->transcription_elongation_rate_given)
+    write_into_file(outfile, "transcription_elongation_rate", args_info->transcription_elongation_rate_orig, 0);
+  if (args_info->kinfold_seconds_per_time_unit_given)
+    write_into_file(outfile, "kinfold_seconds_per_time_unit", args_info->kinfold_seconds_per_time_unit_orig, 0);
+  if (args_info->max_bubble_width_given)
+    write_into_file(outfile, "max_bubble_width", args_info->max_bubble_width_orig, 0);
+  if (args_info->dump_transcription_neighbors_given)
+    write_into_file(outfile, "dump_transcription_neighbors", 0, 0 );
   if (args_info->phi_given)
     write_into_file(outfile, "phi", args_info->phi_orig, 0);
   if (args_info->pbounds_given)
@@ -1355,6 +1396,7 @@ cmdline_parser_internal (
         { "noLP",	0, NULL, 0 },
         { "seed",	1, NULL, 0 },
         { "time",	1, NULL, 0 },
+        { "time-step",	1, NULL, 0 },
         { "num",	1, NULL, 0 },
         { "start",	0, NULL, 0 },
         { "stop",	0, NULL, 0 },
@@ -1363,6 +1405,10 @@ cmdline_parser_internal (
         { "rect",	0, NULL, 0 },
         { "grow",	1, NULL, 0 },
         { "glen",	1, NULL, 0 },
+        { "transcription_elongation_rate",	1, NULL, 0 },
+        { "kinfold_seconds_per_time_unit",	1, NULL, 0 },
+        { "max_bubble_width",	1, NULL, 0 },
+        { "dump_transcription_neighbors",	0, NULL, 0 },
         { "phi",	1, NULL, 0 },
         { "pbounds",	1, NULL, 0 },
         { "log",	1, NULL, 0 },
@@ -1527,6 +1573,20 @@ cmdline_parser_internal (
               goto failure;
           
           }
+          /* save/output trajectory state every <float> seconds.  */
+          else if (strcmp (long_options[option_index].name, "time-step") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->time_step_arg), 
+                 &(args_info->time_step_orig), &(args_info->time_step_given),
+                &(local_args_info.time_step_given), optarg, 0, "1.0", ARG_DOUBLE,
+                check_ambiguity, override, 0, 0,
+                "time-step", '-',
+                additional_error))
+              goto failure;
+          
+          }
           /* set number of trajectories.  */
           else if (strcmp (long_options[option_index].name, "num") == 0)
           {
@@ -1601,7 +1661,7 @@ cmdline_parser_internal (
               goto failure;
           
           }
-          /* grow chain every <float> time units.  */
+          /* deprecated compatibility alias for transcription elongation.  */
           else if (strcmp (long_options[option_index].name, "grow") == 0)
           {
           
@@ -1625,6 +1685,60 @@ cmdline_parser_internal (
                 &(local_args_info.glen_given), optarg, 0, "15", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "glen", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* set transcription elongation rate in nucleotides per second.  */
+          else if (strcmp (long_options[option_index].name, "transcription_elongation_rate") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->transcription_elongation_rate_arg), 
+                 &(args_info->transcription_elongation_rate_orig), &(args_info->transcription_elongation_rate_given),
+                &(local_args_info.transcription_elongation_rate_given), optarg, 0, "0", ARG_DOUBLE,
+                check_ambiguity, override, 0, 0,
+                "transcription_elongation_rate", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* set physical seconds represented by one Kinfold time unit.  */
+          else if (strcmp (long_options[option_index].name, "kinfold_seconds_per_time_unit") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->kinfold_seconds_per_time_unit_arg), 
+                 &(args_info->kinfold_seconds_per_time_unit_orig), &(args_info->kinfold_seconds_per_time_unit_given),
+                &(local_args_info.kinfold_seconds_per_time_unit_given), optarg, 0, "1e-5", ARG_DOUBLE,
+                check_ambiguity, override, 0, 0,
+                "kinfold_seconds_per_time_unit", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* set maximum transcription bubble width in nucleotides.  */
+          else if (strcmp (long_options[option_index].name, "max_bubble_width") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->max_bubble_width_arg), 
+                 &(args_info->max_bubble_width_orig), &(args_info->max_bubble_width_given),
+                &(local_args_info.max_bubble_width_given), optarg, 0, "0", ARG_INT,
+                check_ambiguity, override, 0, 0,
+                "max_bubble_width", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* debug: dump transcription/bubble neighbor sets to stderr.  */
+          else if (strcmp (long_options[option_index].name, "dump_transcription_neighbors") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->dump_transcription_neighbors_flag), 0, &(args_info->dump_transcription_neighbors_given),
+                &(local_args_info.dump_transcription_neighbors_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "dump_transcription_neighbors", '-',
                 additional_error))
               goto failure;
           
@@ -1683,14 +1797,14 @@ cmdline_parser_internal (
               goto failure;
           
           }
-          /* only print structures with E <= MFE + <float> to stdout.  */
+          /* only print structures with E <= MFE + <float> to stdout (default: no cutoff).  */
           else if (strcmp (long_options[option_index].name, "cut") == 0)
           {
           
           
             if (update_arg( (void *)&(args_info->cut_arg), 
                  &(args_info->cut_orig), &(args_info->cut_given),
-                &(local_args_info.cut_given), optarg, 0, "20", ARG_FLOAT,
+                &(local_args_info.cut_given), optarg, 0, "0", ARG_FLOAT,
                 check_ambiguity, override, 0, 0,
                 "cut", '-',
                 additional_error))

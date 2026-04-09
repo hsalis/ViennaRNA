@@ -177,8 +177,9 @@ am___RNA_la_SOURCES_DIST = $(srcdir)/../RNA.i $(srcdir)/../aln_utils.i \
 	$(srcdir)/../data_structures.i $(srcdir)/../dp_matrices.i \
 	$(srcdir)/../duplex.i $(srcdir)/../eval.i \
 	$(srcdir)/../file_formats.i $(srcdir)/../fold_compound.i \
-	$(srcdir)/../grammar.i $(srcdir)/../inverse.i \
-	$(srcdir)/../loops.i $(srcdir)/../math.i $(srcdir)/../mfe.i \
+	$(srcdir)/../grammar.i $(srcdir)/../kinfold.i \
+	$(srcdir)/../inverse.i $(srcdir)/../loops.i \
+	$(srcdir)/../math.i $(srcdir)/../mfe.i \
 	$(srcdir)/../mfe_window.i $(srcdir)/../model_details.i \
 	$(srcdir)/../move.i $(srcdir)/../neighbor.i \
 	$(srcdir)/../params.i $(srcdir)/../part_func.i \
@@ -666,6 +667,7 @@ SWIG_misc_src = \
   $(srcdir)/../file_formats.i \
   $(srcdir)/../fold_compound.i \
   $(srcdir)/../grammar.i \
+  $(srcdir)/../kinfold.i \
   $(srcdir)/../inverse.i \
   $(srcdir)/../loops.i \
   $(srcdir)/../math.i \

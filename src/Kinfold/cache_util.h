@@ -24,10 +24,12 @@ typedef struct {
   short *neighbors;  
   float *rates;
   double *energies;
+  unsigned char *move_kinds;
 } cache_entry;
 
 extern cache_entry *lookup_cache (char *x);
 extern int write_cache (cache_entry *x);
+void initialize_cache(void);
 void kill_cache(void);
 
 #endif

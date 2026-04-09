@@ -107,7 +107,8 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_Kinfold_OBJECTS = baum.$(OBJEXT) cache.$(OBJEXT) globals.$(OBJEXT) \
-	main.$(OBJEXT) nachbar.$(OBJEXT) cmdline.$(OBJEXT)
+	main.$(OBJEXT) nachbar.$(OBJEXT) kinfold_api.$(OBJEXT) \
+	cmdline.$(OBJEXT)
 Kinfold_OBJECTS = $(am_Kinfold_OBJECTS)
 Kinfold_LDADD = $(LDADD)
 Kinfold_DEPENDENCIES =
@@ -124,11 +125,11 @@ am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.@am__isrc@
-depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/baum.Po ./$(DEPDIR)/cache.Po \
 	./$(DEPDIR)/cmdline.Po ./$(DEPDIR)/globals.Po \
-	./$(DEPDIR)/main.Po ./$(DEPDIR)/nachbar.Po
+	./$(DEPDIR)/kinfold_api.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/nachbar.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -214,7 +215,17 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(dist_man_MANS) $(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in AUTHORS COPYING ChangeLog INSTALL NEWS \
+	$(srcdir)/config.h.in $(top_srcdir)/../../config/compile \
+	$(top_srcdir)/../../config/config.guess \
+	$(top_srcdir)/../../config/config.sub \
+	$(top_srcdir)/../../config/depcomp \
+	$(top_srcdir)/../../config/install-sh \
+	$(top_srcdir)/../../config/missing ../../config/ar-lib \
+	../../config/compile ../../config/config.guess \
+	../../config/config.sub ../../config/depcomp \
+	../../config/install-sh ../../config/ltmain.sh \
+	../../config/missing ../../config/texinfo.tex \
+	../../config/ylwrap AUTHORS COPYING ChangeLog INSTALL NEWS \
 	README.md compile config.guess config.sub depcomp install-sh \
 	missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -373,13 +384,14 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
 AM_CPPFLAGS = -I$(top_srcdir)/src
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 @WITH_LIBRNA_API3_FALSE@AM_CFLAGS = @VRNA2_CFLAGS@
 @WITH_LIBRNA_API3_TRUE@AM_CFLAGS = @VRNA_CFLAGS@
 @WITH_LIBRNA_API3_FALSE@LDADD = @VRNA2_LIBS@
 @WITH_LIBRNA_API3_TRUE@LDADD = @VRNA_LIBS@
 SUBDIRS = Example
-Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c \
-		  baum.h cache_util.h globals.h   nachbar.h \
+Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c kinfold_api.c \
+		  baum.h cache_util.h globals.h nachbar.h kinfold_api.h \
 		  cmdline.c cmdline.h
 
 EXTRA_DIST = Laplace/extract_data.pl \
@@ -501,6 +513,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmdline.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/globals.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kinfold_api.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nachbar.Po@am__quote@ # am--include-marker
 
@@ -924,6 +937,7 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/cache.Po
 	-rm -f ./$(DEPDIR)/cmdline.Po
 	-rm -f ./$(DEPDIR)/globals.Po
+	-rm -f ./$(DEPDIR)/kinfold_api.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/nachbar.Po
 	-rm -f Makefile
@@ -977,6 +991,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/cache.Po
 	-rm -f ./$(DEPDIR)/cmdline.Po
 	-rm -f ./$(DEPDIR)/globals.Po
+	-rm -f ./$(DEPDIR)/kinfold_api.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/nachbar.Po
 	-rm -f Makefile

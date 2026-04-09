@@ -68,7 +68,6 @@ char coeff[] = {
                 61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
                 61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1};
 
-/* key must not be longer than 128 */
 INLINE static unsigned cache_f(char *x) { 
   register char *s;
   register int i;
@@ -79,11 +78,11 @@ INLINE static unsigned cache_f(char *x) {
   for (i=0,    cache = 0;
        /* while */ *s;
        s++,           i++ , cache *= 5 ) {
-    cache += *s * coeff[i];
+    cache += *s * coeff[i & 127];
   }
 
    /* divide through CACHESIZE for normalization */
-  return ((cache) & (CACHESIZE));
+  return (cache & CACHESIZE);
 }
 
 
@@ -106,18 +105,23 @@ int write_cache (cache_entry *x) {
   
   cacheval=cache_f(x->structure);
   if ((c=cachetab[cacheval])) {
-    free(c->structure);
-    free(c->neighbors);
-    free(c->rates);
-    free(c->energies);
-    free(c);
+    if (c) {
+      free(c->structure);
+      free(c->neighbors);
+      free(c->rates);
+      free(c->energies);
+      free(c->move_kinds);
+      free(c);
+    }
   }
   cachetab[cacheval]=x;
   return 0;
 }
 
 /**/
-void initialize_cache () { }
+void initialize_cache () {
+  collisions = 0;
+}
 
 /**/
 void kill_cache () {
@@ -129,6 +133,7 @@ void kill_cache () {
       free (cachetab[i]->neighbors);
       free (cachetab[i]->rates);
       free (cachetab[i]->energies);
+      free (cachetab[i]->move_kinds);
       free (cachetab[i]);
     }
     cachetab[i]=NULL;

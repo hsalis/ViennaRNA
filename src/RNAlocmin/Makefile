@@ -130,7 +130,6 @@ am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.
-depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/RNAlocmin.Po \
 	./$(DEPDIR)/RNAlocmin_cmdline.Po ./$(DEPDIR)/barrier_tree.Po \
@@ -221,7 +220,17 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 AM_RECURSIVE_TARGETS = cscope
 am__DIST_COMMON = $(dist_man_MANS) $(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in AUTHORS ChangeLog NEWS README compile \
+	$(srcdir)/config.h.in $(top_srcdir)/../../config/compile \
+	$(top_srcdir)/../../config/config.guess \
+	$(top_srcdir)/../../config/config.sub \
+	$(top_srcdir)/../../config/depcomp \
+	$(top_srcdir)/../../config/install-sh \
+	$(top_srcdir)/../../config/missing ../../config/ar-lib \
+	../../config/compile ../../config/config.guess \
+	../../config/config.sub ../../config/depcomp \
+	../../config/install-sh ../../config/ltmain.sh \
+	../../config/missing ../../config/texinfo.tex \
+	../../config/ylwrap AUTHORS ChangeLog NEWS README compile \
 	config.guess config.sub depcomp install-sh missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
@@ -244,12 +253,12 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
 distcleancheck_listfiles = \
   find . \( -type f -a \! \
             \( -name .nfs* -o -name .smb* -o -name .__afs* \) \) -print
-ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAlocmin/missing' aclocal-1.18
+ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' aclocal-1.18
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
-AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAlocmin/missing' autoconf
-AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAlocmin/missing' autoheader
-AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAlocmin/missing' automake-1.18
+AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoconf
+AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoheader
+AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' automake-1.18
 AWK = awk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -276,12 +285,12 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
-ISODATE = 2026-03-19
+ISODATE = 2026-04-08
 LDFLAGS = 
 LIBOBJS = 
 LIBS = 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAlocmin/missing' makeinfo
+MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' makeinfo
 MKDIR_P = mkdir -p
 OBJEXT = o
 PACKAGE = rnalocmin
@@ -335,7 +344,7 @@ host_vendor = apple
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/src/RNAlocmin/install-sh
+install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/config/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -357,6 +366,7 @@ top_build_prefix =
 top_builddir = .
 top_srcdir = .
 AM_CPPFLAGS = $(VRNA_CFLAGS) -Wno-write-strings
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 AM_CXX_FLAGS = -fexceptions
 AM_CFLAGS = -fexceptions
 LDADD = $(VRNA_LIBS)

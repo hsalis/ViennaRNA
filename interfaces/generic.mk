@@ -27,6 +27,7 @@ SWIG_misc_src = \
   $(srcdir)/../file_formats.i \
   $(srcdir)/../fold_compound.i \
   $(srcdir)/../grammar.i \
+  $(srcdir)/../kinfold.i \
   $(srcdir)/../inverse.i \
   $(srcdir)/../loops.i \
   $(srcdir)/../math.i \

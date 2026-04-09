@@ -107,7 +107,8 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_Kinfold_OBJECTS = baum.$(OBJEXT) cache.$(OBJEXT) globals.$(OBJEXT) \
-	main.$(OBJEXT) nachbar.$(OBJEXT) cmdline.$(OBJEXT)
+	main.$(OBJEXT) nachbar.$(OBJEXT) kinfold_api.$(OBJEXT) \
+	cmdline.$(OBJEXT)
 Kinfold_OBJECTS = $(am_Kinfold_OBJECTS)
 Kinfold_LDADD = $(LDADD)
 Kinfold_DEPENDENCIES =
@@ -124,11 +125,11 @@ am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.
-depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/baum.Po ./$(DEPDIR)/cache.Po \
 	./$(DEPDIR)/cmdline.Po ./$(DEPDIR)/globals.Po \
-	./$(DEPDIR)/main.Po ./$(DEPDIR)/nachbar.Po
+	./$(DEPDIR)/kinfold_api.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/nachbar.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -214,7 +215,17 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(dist_man_MANS) $(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in AUTHORS COPYING ChangeLog INSTALL NEWS \
+	$(srcdir)/config.h.in $(top_srcdir)/../../config/compile \
+	$(top_srcdir)/../../config/config.guess \
+	$(top_srcdir)/../../config/config.sub \
+	$(top_srcdir)/../../config/depcomp \
+	$(top_srcdir)/../../config/install-sh \
+	$(top_srcdir)/../../config/missing ../../config/ar-lib \
+	../../config/compile ../../config/config.guess \
+	../../config/config.sub ../../config/depcomp \
+	../../config/install-sh ../../config/ltmain.sh \
+	../../config/missing ../../config/texinfo.tex \
+	../../config/ylwrap AUTHORS COPYING ChangeLog INSTALL NEWS \
 	README.md compile config.guess config.sub depcomp install-sh \
 	missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -263,12 +274,12 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
 distcleancheck_listfiles = \
   find . \( -type f -a \! \
             \( -name .nfs* -o -name .smb* -o -name .__afs* \) \) -print
-ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/src/Kinfold/missing' aclocal-1.18
+ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' aclocal-1.18
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
-AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/src/Kinfold/missing' autoconf
-AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/src/Kinfold/missing' autoheader
-AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/src/Kinfold/missing' automake-1.18
+AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoconf
+AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoheader
+AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' automake-1.18
 AWK = awk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -291,12 +302,12 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
-ISODATE = 2026-03-19
+ISODATE = 2026-04-08
 LDFLAGS = 
 LIBOBJS = 
 LIBS = -lm 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/src/Kinfold/missing' makeinfo
+MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' makeinfo
 MKDIR_P = mkdir -p
 OBJEXT = o
 PACKAGE = Kinfold
@@ -350,7 +361,7 @@ host_vendor = apple
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/src/Kinfold/install-sh
+install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/config/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -373,13 +384,14 @@ top_builddir = .
 top_srcdir = .
 AUTOMAKE_OPTIONS = foreign
 AM_CPPFLAGS = -I$(top_srcdir)/src
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 #AM_CFLAGS = 
 AM_CFLAGS = -I$(top_srcdir)/../../src/ViennaRNA -I$(top_srcdir)/../../src -DVRNA_WITH_NAVIEW_LAYOUT -DVRNA_LOG_NO_DEBUG_RNALIB
 #LDADD = 
 LDADD = -fno-strict-aliasing -L$(top_builddir)/../../src/ViennaRNA -lRNA -lpthread -lstdc++
 SUBDIRS = Example
-Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c \
-		  baum.h cache_util.h globals.h   nachbar.h \
+Kinfold_SOURCES = baum.c cache.c globals.c main.c nachbar.c kinfold_api.c \
+		  baum.h cache_util.h globals.h nachbar.h kinfold_api.h \
 		  cmdline.c cmdline.h
 
 EXTRA_DIST = Laplace/extract_data.pl \
@@ -501,6 +513,7 @@ include ./$(DEPDIR)/baum.Po # am--include-marker
 include ./$(DEPDIR)/cache.Po # am--include-marker
 include ./$(DEPDIR)/cmdline.Po # am--include-marker
 include ./$(DEPDIR)/globals.Po # am--include-marker
+include ./$(DEPDIR)/kinfold_api.Po # am--include-marker
 include ./$(DEPDIR)/main.Po # am--include-marker
 include ./$(DEPDIR)/nachbar.Po # am--include-marker
 
@@ -924,6 +937,7 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/cache.Po
 	-rm -f ./$(DEPDIR)/cmdline.Po
 	-rm -f ./$(DEPDIR)/globals.Po
+	-rm -f ./$(DEPDIR)/kinfold_api.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/nachbar.Po
 	-rm -f Makefile
@@ -977,6 +991,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/cache.Po
 	-rm -f ./$(DEPDIR)/cmdline.Po
 	-rm -f ./$(DEPDIR)/globals.Po
+	-rm -f ./$(DEPDIR)/kinfold_api.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/nachbar.Po
 	-rm -f Makefile

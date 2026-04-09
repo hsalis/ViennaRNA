@@ -178,8 +178,9 @@ am___RNA_la_SOURCES_DIST = $(srcdir)/../RNA.i $(srcdir)/../aln_utils.i \
 	$(srcdir)/../data_structures.i $(srcdir)/../dp_matrices.i \
 	$(srcdir)/../duplex.i $(srcdir)/../eval.i \
 	$(srcdir)/../file_formats.i $(srcdir)/../fold_compound.i \
-	$(srcdir)/../grammar.i $(srcdir)/../inverse.i \
-	$(srcdir)/../loops.i $(srcdir)/../math.i $(srcdir)/../mfe.i \
+	$(srcdir)/../grammar.i $(srcdir)/../kinfold.i \
+	$(srcdir)/../inverse.i $(srcdir)/../loops.i \
+	$(srcdir)/../math.i $(srcdir)/../mfe.i \
 	$(srcdir)/../mfe_window.i $(srcdir)/../model_details.i \
 	$(srcdir)/../move.i $(srcdir)/../neighbor.i \
 	$(srcdir)/../params.i $(srcdir)/../part_func.i \
@@ -200,13 +201,22 @@ am___RNA_la_SOURCES_DIST = $(srcdir)/../RNA.i $(srcdir)/../aln_utils.i \
 	$(srcdir)/callbacks-pf-window.i $(srcdir)/callbacks-log.i \
 	$(srcdir)/callbacks-probing.i \
 	$(srcdir)/callbacks-probing-data.i $(builddir)/version.i \
-	documentation.i RNA_wrap.cpp
+	documentation.i RNA_wrap.cpp $(srcdir)/kinfold_api_wrapper.cpp \
+	$(top_srcdir)/src/Kinfold/baum.c \
+	$(top_srcdir)/src/Kinfold/cache.c \
+	$(top_srcdir)/src/Kinfold/globals.c \
+	$(top_srcdir)/src/Kinfold/nachbar.c \
+	$(top_srcdir)/src/Kinfold/kinfold_api.c \
+	$(top_srcdir)/src/Kinfold/cmdline.c
 am__objects_1 =
 am__objects_2 = $(am__objects_1) $(am__objects_1) $(am__objects_1)
 am__objects_3 = $(am__objects_1)
 am__objects_4 = $(am__objects_2) $(am__objects_3)
 am__objects_5 = _RNA_la-RNA_wrap.lo
-am__RNA_la_OBJECTS = $(am__objects_4) $(am__objects_5)
+am__RNA_la_OBJECTS = $(am__objects_4) $(am__objects_5) \
+	_RNA_la-kinfold_api_wrapper.lo _RNA_la-baum.lo \
+	_RNA_la-cache.lo _RNA_la-globals.lo _RNA_la-nachbar.lo \
+	_RNA_la-kinfold_api.lo _RNA_la-cmdline.lo
 _RNA_la_OBJECTS = $(am__RNA_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -229,8 +239,30 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/config/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/_RNA_la-RNA_wrap.Plo
+am__depfiles_remade = ./$(DEPDIR)/_RNA_la-RNA_wrap.Plo \
+	./$(DEPDIR)/_RNA_la-baum.Plo ./$(DEPDIR)/_RNA_la-cache.Plo \
+	./$(DEPDIR)/_RNA_la-cmdline.Plo \
+	./$(DEPDIR)/_RNA_la-globals.Plo \
+	./$(DEPDIR)/_RNA_la-kinfold_api.Plo \
+	./$(DEPDIR)/_RNA_la-kinfold_api_wrapper.Plo \
+	./$(DEPDIR)/_RNA_la-nachbar.Plo
 am__mv = mv -f
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_1 = 
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 LTCXXCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
@@ -669,6 +701,7 @@ SWIG_misc_src = \
   $(srcdir)/../file_formats.i \
   $(srcdir)/../fold_compound.i \
   $(srcdir)/../grammar.i \
+  $(srcdir)/../kinfold.i \
   $(srcdir)/../inverse.i \
   $(srcdir)/../loops.i \
   $(srcdir)/../math.i \
@@ -740,7 +773,14 @@ pkgpyvrnaexec_DATA = \
     ViennaRNA/__init__.py
 
 _RNA_la_SOURCES = $(INTERFACE_FILES) \
-                  $(SWIG_wrapper)
+                  $(SWIG_wrapper) \
+                  $(srcdir)/kinfold_api_wrapper.cpp \
+                  $(top_srcdir)/src/Kinfold/baum.c \
+                  $(top_srcdir)/src/Kinfold/cache.c \
+                  $(top_srcdir)/src/Kinfold/globals.c \
+                  $(top_srcdir)/src/Kinfold/nachbar.c \
+                  $(top_srcdir)/src/Kinfold/kinfold_api.c \
+                  $(top_srcdir)/src/Kinfold/cmdline.c
 
 EXTRA_DIST = \
   $(SWIG_wrapper) \
@@ -775,7 +815,7 @@ CLEANFILES = \
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .cpp .lo .o .obj
+.SUFFIXES: .c .cpp .lo .o .obj
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(top_srcdir)/silent_rules.mk $(srcdir)/../generic.mk $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -852,12 +892,82 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-RNA_wrap.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-baum.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-cache.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-cmdline.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-globals.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-kinfold_api.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-kinfold_api_wrapper.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_RNA_la-nachbar.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
 	@: >>$@
 
 am--depfiles: $(am__depfiles_remade)
+
+.c.o:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+.c.lo:
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+_RNA_la-baum.lo: $(top_srcdir)/src/Kinfold/baum.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-baum.lo -MD -MP -MF $(DEPDIR)/_RNA_la-baum.Tpo -c -o _RNA_la-baum.lo `test -f '$(top_srcdir)/src/Kinfold/baum.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/baum.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-baum.Tpo $(DEPDIR)/_RNA_la-baum.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/baum.c' object='_RNA_la-baum.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-baum.lo `test -f '$(top_srcdir)/src/Kinfold/baum.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/baum.c
+
+_RNA_la-cache.lo: $(top_srcdir)/src/Kinfold/cache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-cache.lo -MD -MP -MF $(DEPDIR)/_RNA_la-cache.Tpo -c -o _RNA_la-cache.lo `test -f '$(top_srcdir)/src/Kinfold/cache.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/cache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-cache.Tpo $(DEPDIR)/_RNA_la-cache.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/cache.c' object='_RNA_la-cache.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-cache.lo `test -f '$(top_srcdir)/src/Kinfold/cache.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/cache.c
+
+_RNA_la-globals.lo: $(top_srcdir)/src/Kinfold/globals.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-globals.lo -MD -MP -MF $(DEPDIR)/_RNA_la-globals.Tpo -c -o _RNA_la-globals.lo `test -f '$(top_srcdir)/src/Kinfold/globals.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/globals.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-globals.Tpo $(DEPDIR)/_RNA_la-globals.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/globals.c' object='_RNA_la-globals.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-globals.lo `test -f '$(top_srcdir)/src/Kinfold/globals.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/globals.c
+
+_RNA_la-nachbar.lo: $(top_srcdir)/src/Kinfold/nachbar.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-nachbar.lo -MD -MP -MF $(DEPDIR)/_RNA_la-nachbar.Tpo -c -o _RNA_la-nachbar.lo `test -f '$(top_srcdir)/src/Kinfold/nachbar.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/nachbar.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-nachbar.Tpo $(DEPDIR)/_RNA_la-nachbar.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/nachbar.c' object='_RNA_la-nachbar.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-nachbar.lo `test -f '$(top_srcdir)/src/Kinfold/nachbar.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/nachbar.c
+
+_RNA_la-kinfold_api.lo: $(top_srcdir)/src/Kinfold/kinfold_api.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-kinfold_api.lo -MD -MP -MF $(DEPDIR)/_RNA_la-kinfold_api.Tpo -c -o _RNA_la-kinfold_api.lo `test -f '$(top_srcdir)/src/Kinfold/kinfold_api.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/kinfold_api.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-kinfold_api.Tpo $(DEPDIR)/_RNA_la-kinfold_api.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/kinfold_api.c' object='_RNA_la-kinfold_api.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-kinfold_api.lo `test -f '$(top_srcdir)/src/Kinfold/kinfold_api.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/kinfold_api.c
+
+_RNA_la-cmdline.lo: $(top_srcdir)/src/Kinfold/cmdline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -MT _RNA_la-cmdline.lo -MD -MP -MF $(DEPDIR)/_RNA_la-cmdline.Tpo -c -o _RNA_la-cmdline.lo `test -f '$(top_srcdir)/src/Kinfold/cmdline.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/cmdline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-cmdline.Tpo $(DEPDIR)/_RNA_la-cmdline.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_srcdir)/src/Kinfold/cmdline.c' object='_RNA_la-cmdline.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CFLAGS) $(CFLAGS) -c -o _RNA_la-cmdline.lo `test -f '$(top_srcdir)/src/Kinfold/cmdline.c' || echo '$(srcdir)/'`$(top_srcdir)/src/Kinfold/cmdline.c
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -886,6 +996,13 @@ _RNA_la-RNA_wrap.lo: RNA_wrap.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='RNA_wrap.cpp' object='_RNA_la-RNA_wrap.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CXXFLAGS) $(CXXFLAGS) -c -o _RNA_la-RNA_wrap.lo `test -f 'RNA_wrap.cpp' || echo '$(srcdir)/'`RNA_wrap.cpp
+
+_RNA_la-kinfold_api_wrapper.lo: $(srcdir)/kinfold_api_wrapper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CXXFLAGS) $(CXXFLAGS) -MT _RNA_la-kinfold_api_wrapper.lo -MD -MP -MF $(DEPDIR)/_RNA_la-kinfold_api_wrapper.Tpo -c -o _RNA_la-kinfold_api_wrapper.lo `test -f '$(srcdir)/kinfold_api_wrapper.cpp' || echo '$(srcdir)/'`$(srcdir)/kinfold_api_wrapper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_RNA_la-kinfold_api_wrapper.Tpo $(DEPDIR)/_RNA_la-kinfold_api_wrapper.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/kinfold_api_wrapper.cpp' object='_RNA_la-kinfold_api_wrapper.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_RNA_la_CPPFLAGS) $(CPPFLAGS) $(_RNA_la_CXXFLAGS) $(CXXFLAGS) -c -o _RNA_la-kinfold_api_wrapper.lo `test -f '$(srcdir)/kinfold_api_wrapper.cpp' || echo '$(srcdir)/'`$(srcdir)/kinfold_api_wrapper.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1086,6 +1203,13 @@ clean-am: clean-generic clean-libtool clean-local \
 
 distclean: distclean-am
 	-rm -f ./$(DEPDIR)/_RNA_la-RNA_wrap.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-baum.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-cache.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-cmdline.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-globals.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-kinfold_api.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-kinfold_api_wrapper.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-nachbar.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -1134,6 +1258,13 @@ installcheck-am:
 
 maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/_RNA_la-RNA_wrap.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-baum.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-cache.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-cmdline.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-globals.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-kinfold_api.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-kinfold_api_wrapper.Plo
+	-rm -f ./$(DEPDIR)/_RNA_la-nachbar.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic \
 	maintainer-clean-local

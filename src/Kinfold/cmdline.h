@@ -61,6 +61,9 @@ struct gengetopt_args_info
   float time_arg;	/**< @brief set maxtime of simulation (default='500').  */
   char * time_orig;	/**< @brief set maxtime of simulation original value given at command line.  */
   const char *time_help; /**< @brief set maxtime of simulation help description.  */
+  double time_step_arg;	/**< @brief save/output trajectory state every <float> seconds (default='1.0').  */
+  char * time_step_orig;	/**< @brief save/output trajectory state every <float> seconds original value given at command line.  */
+  const char *time_step_help; /**< @brief save/output trajectory state every <float> seconds help description.  */
   int num_arg;	/**< @brief set number of trajectories (default='1').  */
   char * num_orig;	/**< @brief set number of trajectories original value given at command line.  */
   const char *num_help; /**< @brief set number of trajectories help description.  */
@@ -74,12 +77,23 @@ struct gengetopt_args_info
   const char *fpt_help; /**< @brief compute first passage time (stop when a stop-structure is reached) help description.  */
   int rect_flag;	/**< @brief compute recurrence time (of a start structure which is contained in stop structures) (default=off).  */
   const char *rect_help; /**< @brief compute recurrence time (of a start structure which is contained in stop structures) help description.  */
-  float grow_arg;	/**< @brief grow chain every <float> time units (default='0').  */
-  char * grow_orig;	/**< @brief grow chain every <float> time units original value given at command line.  */
-  const char *grow_help; /**< @brief grow chain every <float> time units help description.  */
+  float grow_arg;	/**< @brief deprecated compatibility alias for transcription elongation (default='0').  */
+  char * grow_orig;	/**< @brief deprecated compatibility alias for transcription elongation original value given at command line.  */
+  const char *grow_help; /**< @brief deprecated compatibility alias for transcription elongation help description.  */
   int glen_arg;	/**< @brief initial size of growing chain (default='15').  */
   char * glen_orig;	/**< @brief initial size of growing chain original value given at command line.  */
   const char *glen_help; /**< @brief initial size of growing chain help description.  */
+  double transcription_elongation_rate_arg;	/**< @brief set transcription elongation rate in nucleotides per second (default='0').  */
+  char * transcription_elongation_rate_orig;	/**< @brief set transcription elongation rate in nucleotides per second original value given at command line.  */
+  const char *transcription_elongation_rate_help; /**< @brief set transcription elongation rate in nucleotides per second help description.  */
+  double kinfold_seconds_per_time_unit_arg;	/**< @brief set physical seconds represented by one Kinfold time unit (default='1e-5').  */
+  char * kinfold_seconds_per_time_unit_orig;	/**< @brief set physical seconds represented by one Kinfold time unit original value given at command line.  */
+  const char *kinfold_seconds_per_time_unit_help; /**< @brief set physical seconds represented by one Kinfold time unit help description.  */
+  int max_bubble_width_arg;	/**< @brief set maximum transcription bubble width in nucleotides (default='0').  */
+  char * max_bubble_width_orig;	/**< @brief set maximum transcription bubble width in nucleotides original value given at command line.  */
+  const char *max_bubble_width_help; /**< @brief set maximum transcription bubble width in nucleotides help description.  */
+  int dump_transcription_neighbors_flag;	/**< @brief debug: dump transcription/bubble neighbor sets to stderr (default=off).  */
+  const char *dump_transcription_neighbors_help; /**< @brief debug: dump transcription/bubble neighbor sets to stderr help description.  */
   double phi_arg;	/**< @brief set phi value.  */
   char * phi_orig;	/**< @brief set phi value original value given at command line.  */
   const char *phi_help; /**< @brief set phi value help description.  */
@@ -95,9 +109,9 @@ struct gengetopt_args_info
   const char *verbose_help; /**< @brief more information to stdout help description.  */
   int lmin_flag;	/**< @brief output only local minima to stdout (default=off).  */
   const char *lmin_help; /**< @brief output only local minima to stdout help description.  */
-  float cut_arg;	/**< @brief only print structures with E <= MFE + <float> to stdout (default='20').  */
-  char * cut_orig;	/**< @brief only print structures with E <= MFE + <float> to stdout original value given at command line.  */
-  const char *cut_help; /**< @brief only print structures with E <= MFE + <float> to stdout help description.  */
+  float cut_arg;	/**< @brief only print structures with E <= MFE + <float> to stdout (default: no cutoff) (default='0').  */
+  char * cut_orig;	/**< @brief only print structures with E <= MFE + <float> to stdout (default: no cutoff) original value given at command line.  */
+  const char *cut_help; /**< @brief only print structures with E <= MFE + <float> to stdout (default: no cutoff) help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int full_help_given ;	/**< @brief Whether full-help was given.  */
@@ -110,6 +124,7 @@ struct gengetopt_args_info
   unsigned int noLP_given ;	/**< @brief Whether noLP was given.  */
   unsigned int seed_given ;	/**< @brief Whether seed was given.  */
   unsigned int time_given ;	/**< @brief Whether time was given.  */
+  unsigned int time_step_given ;	/**< @brief Whether time-step was given.  */
   unsigned int num_given ;	/**< @brief Whether num was given.  */
   unsigned int start_given ;	/**< @brief Whether start was given.  */
   unsigned int stop_given ;	/**< @brief Whether stop was given.  */
@@ -118,6 +133,10 @@ struct gengetopt_args_info
   unsigned int rect_given ;	/**< @brief Whether rect was given.  */
   unsigned int grow_given ;	/**< @brief Whether grow was given.  */
   unsigned int glen_given ;	/**< @brief Whether glen was given.  */
+  unsigned int transcription_elongation_rate_given ;	/**< @brief Whether transcription_elongation_rate was given.  */
+  unsigned int kinfold_seconds_per_time_unit_given ;	/**< @brief Whether kinfold_seconds_per_time_unit was given.  */
+  unsigned int max_bubble_width_given ;	/**< @brief Whether max_bubble_width was given.  */
+  unsigned int dump_transcription_neighbors_given ;	/**< @brief Whether dump_transcription_neighbors was given.  */
   unsigned int phi_given ;	/**< @brief Whether phi was given.  */
   unsigned int pbounds_given ;	/**< @brief Whether pbounds was given.  */
   unsigned int log_given ;	/**< @brief Whether log was given.  */

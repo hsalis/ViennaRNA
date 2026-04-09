@@ -132,7 +132,6 @@ am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I. -I$(top_builddir)
-depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/aligner.Po ./$(DEPDIR)/forestbase.Po \
 	./$(DEPDIR)/main.Po ./$(DEPDIR)/parser.Po \
@@ -175,7 +174,7 @@ AM_V_LEX = $(am__v_LEX_$(V))
 am__v_LEX_ = $(am__v_LEX_$(AM_DEFAULT_VERBOSITY))
 am__v_LEX_0 = @echo "  LEX     " $@;
 am__v_LEX_1 = 
-YLWRAP = $(top_srcdir)/ylwrap
+YLWRAP = $(top_srcdir)/../../config/ylwrap
 am__yacc_c2h = sed -e s/cc$$/hh/ -e s/cpp$$/hpp/ -e s/cxx$$/hxx/ \
 		   -e s/c++$$/h++/ -e s/c$$/h/
 YACCCOMPILE = $(YACC) $(AM_YFLAGS) $(YFLAGS)
@@ -208,16 +207,17 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp \
-	$(top_srcdir)/ylwrap anchors/bplex.cpp anchors/shape.cpp \
-	anchors/shape.hpp
+am__DIST_COMMON = $(srcdir)/Makefile.in \
+	$(top_srcdir)/../../config/depcomp \
+	$(top_srcdir)/../../config/ylwrap anchors/bplex.cpp \
+	anchors/shape.cpp anchors/shape.hpp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAforester/missing' aclocal-1.18
+ACLOCAL = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' aclocal-1.18
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
-AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAforester/missing' autoconf
-AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAforester/missing' autoheader
-AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAforester/missing' automake-1.18
+AUTOCONF = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoconf
+AUTOHEADER = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' autoheader
+AUTOMAKE = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' automake-1.18
 AWK = awk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -250,7 +250,7 @@ LEX_OUTPUT_ROOT = lex.yy
 LIBOBJS = 
 LIBS = -lg2 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/src/RNAforester/missing' makeinfo
+MAKEINFO = ${SHELL} '/Users/howardsalis/ViennaRNA/config/missing' makeinfo
 MKDIR_P = mkdir -p
 OBJEXT = o
 OPENMP_CXXFLAGS = 
@@ -298,7 +298,7 @@ host_alias =
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/src/RNAforester/install-sh
+install_sh = ${SHELL} /Users/howardsalis/ViennaRNA/config/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -321,6 +321,7 @@ top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ..
 AUTOMAKE_OPTIONS = subdir-objects
+depcomp = $(SHELL) $(top_srcdir)/../../config/depcomp
 
 # C++ preprocesspr flags 
 AM_CPPFLAGS = $(VRNA_CFLAGS) \
@@ -601,24 +602,10 @@ am--depfiles: $(am__depfiles_remade)
 #	$(AM_V_CXX_no)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .lpp.cpp:
-	@if test -x "$(YLWRAP)"; then \
-	  $(AM_V_LEX)$(am__skiplex) $(SHELL) $(YLWRAP) $< $(LEX_OUTPUT_ROOT).c $@ -- $(LEXCOMPILE); \
-	elif test -f $@; then \
-	  :; \
-	else \
-	  echo "ylwrap not found and generated lexer source '$@' is missing" >&2; \
-	  exit 1; \
-	fi
+	$(AM_V_LEX)$(am__skiplex) $(SHELL) $(YLWRAP) $< $(LEX_OUTPUT_ROOT).c $@ -- $(LEXCOMPILE)
 
 .ypp.cpp:
-	@if test -x "$(YLWRAP)"; then \
-	  $(AM_V_YACC)$(am__skipyacc) $(SHELL) $(YLWRAP) $< y.tab.c $@ y.tab.h `echo $@ | $(am__yacc_c2h)` y.output $*.output -- $(YACCCOMPILE); \
-	elif test -f $@ && test -f `echo $@ | $(am__yacc_c2h)`; then \
-	  :; \
-	else \
-	  echo "ylwrap not found and generated parser outputs for '$@' are missing" >&2; \
-	  exit 1; \
-	fi
+	$(AM_V_YACC)$(am__skipyacc) $(SHELL) $(YLWRAP) $< y.tab.c $@ y.tab.h `echo $@ | $(am__yacc_c2h)` y.output $*.output -- $(YACCCOMPILE)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique

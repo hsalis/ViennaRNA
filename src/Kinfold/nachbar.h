@@ -17,5 +17,5 @@ extern void update_nbList(int i,int j, int iE);
 extern int sel_nb(void);
 extern void clean_up_nbList(void);
 
-extern void grow_chain(void);
+extern char kinfold_move_char(int next);
 #endif

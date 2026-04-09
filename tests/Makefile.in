@@ -99,7 +99,7 @@ host_triplet = @host@
 @WITH_UNIT_TESTS_TRUE@TESTS = $(EXECUTABLE_TESTS) $(am__EXEEXT_1) \
 @WITH_UNIT_TESTS_TRUE@	$(PERL_TESTS) $(PYTHON2_TESTS) \
 @WITH_UNIT_TESTS_TRUE@	$(PYTHON3_TESTS)
-@WITH_UNIT_TESTS_TRUE@noinst_PROGRAMS =
+noinst_PROGRAMS =
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_rna.m4 \
@@ -197,155 +197,6 @@ neighbor_OBJECTS = neighbor.$(OBJEXT)
 neighbor_LDADD = $(LDADD)
 neighbor_DEPENDENCIES = $(top_builddir)/src/ViennaRNA/libRNA.la \
 	$(am__DEPENDENCIES_2) $(am__DEPENDENCIES_3)
-am__perf_duplex_bench_SOURCES_DIST = perf/duplex_bench.c
-am__dirstamp = $(am__leading_dot)dirstamp
-@WITH_UNIT_TESTS_TRUE@am_perf_duplex_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/duplex_bench.$(OBJEXT)
-perf_duplex_bench_OBJECTS = $(am_perf_duplex_bench_OBJECTS)
-perf_duplex_bench_LDADD = $(LDADD)
-perf_duplex_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_findpath_bench_SOURCES_DIST = perf/findpath_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_findpath_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/findpath_bench.$(OBJEXT)
-perf_findpath_bench_OBJECTS = $(am_perf_findpath_bench_OBJECTS)
-perf_findpath_bench_LDADD = $(LDADD)
-perf_findpath_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_heat_capacity_bench_SOURCES_DIST =  \
-	perf/heat_capacity_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_heat_capacity_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/heat_capacity_bench.$(OBJEXT)
-perf_heat_capacity_bench_OBJECTS =  \
-	$(am_perf_heat_capacity_bench_OBJECTS)
-perf_heat_capacity_bench_LDADD = $(LDADD)
-perf_heat_capacity_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_inverse_bench_SOURCES_DIST = perf/inverse_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_inverse_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/inverse_bench.$(OBJEXT)
-perf_inverse_bench_OBJECTS = $(am_perf_inverse_bench_OBJECTS)
-perf_inverse_bench_LDADD = $(LDADD)
-perf_inverse_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_part_func_up_bench_SOURCES_DIST = perf/part_func_up_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_part_func_up_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/part_func_up_bench.$(OBJEXT)
-perf_part_func_up_bench_OBJECTS =  \
-	$(am_perf_part_func_up_bench_OBJECTS)
-perf_part_func_up_bench_LDADD = $(LDADD)
-perf_part_func_up_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_plex_bench_SOURCES_DIST = perf/plex_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_plex_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/plex_bench.$(OBJEXT)
-perf_plex_bench_OBJECTS = $(am_perf_plex_bench_OBJECTS)
-perf_plex_bench_LDADD = $(LDADD)
-perf_plex_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rna_window_bench_SOURCES_DIST = perf/rna_window_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rna_window_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rna_window_bench.$(OBJEXT)
-perf_rna_window_bench_OBJECTS = $(am_perf_rna_window_bench_OBJECTS)
-perf_rna_window_bench_LDADD = $(LDADD)
-perf_rna_window_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnaalifold_mfe_bench_SOURCES_DIST =  \
-	perf/rnaalifold_mfe_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnaalifold_mfe_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnaalifold_mfe_bench.$(OBJEXT)
-perf_rnaalifold_mfe_bench_OBJECTS =  \
-	$(am_perf_rnaalifold_mfe_bench_OBJECTS)
-perf_rnaalifold_mfe_bench_LDADD = $(LDADD)
-perf_rnaalifold_mfe_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnaalifold_pf_bench_SOURCES_DIST =  \
-	perf/rnaalifold_pf_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnaalifold_pf_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnaalifold_pf_bench.$(OBJEXT)
-perf_rnaalifold_pf_bench_OBJECTS =  \
-	$(am_perf_rnaalifold_pf_bench_OBJECTS)
-perf_rnaalifold_pf_bench_LDADD = $(LDADD)
-perf_rnaalifold_pf_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnacofold_mfe_bench_SOURCES_DIST =  \
-	perf/rnacofold_mfe_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnacofold_mfe_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnacofold_mfe_bench.$(OBJEXT)
-perf_rnacofold_mfe_bench_OBJECTS =  \
-	$(am_perf_rnacofold_mfe_bench_OBJECTS)
-perf_rnacofold_mfe_bench_LDADD = $(LDADD)
-perf_rnacofold_mfe_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnacofold_pf_bench_SOURCES_DIST = perf/rnacofold_pf_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnacofold_pf_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnacofold_pf_bench.$(OBJEXT)
-perf_rnacofold_pf_bench_OBJECTS =  \
-	$(am_perf_rnacofold_pf_bench_OBJECTS)
-perf_rnacofold_pf_bench_LDADD = $(LDADD)
-perf_rnacofold_pf_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnafold_mfe_bench_SOURCES_DIST = perf/rnafold_mfe_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnafold_mfe_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnafold_mfe_bench.$(OBJEXT)
-perf_rnafold_mfe_bench_OBJECTS = $(am_perf_rnafold_mfe_bench_OBJECTS)
-perf_rnafold_mfe_bench_LDADD = $(LDADD)
-perf_rnafold_mfe_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_rnasubopt_bench_SOURCES_DIST = perf/rnasubopt_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_rnasubopt_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/rnasubopt_bench.$(OBJEXT)
-perf_rnasubopt_bench_OBJECTS = $(am_perf_rnasubopt_bench_OBJECTS)
-perf_rnasubopt_bench_LDADD = $(LDADD)
-perf_rnasubopt_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_sampling_bench_SOURCES_DIST = perf/sampling_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_sampling_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/sampling_bench.$(OBJEXT)
-perf_sampling_bench_OBJECTS = $(am_perf_sampling_bench_OBJECTS)
-perf_sampling_bench_LDADD = $(LDADD)
-perf_sampling_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_twoDfold_bench_SOURCES_DIST = perf/twoDfold_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_twoDfold_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/twoDfold_bench.$(OBJEXT)
-perf_twoDfold_bench_OBJECTS = $(am_perf_twoDfold_bench_OBJECTS)
-perf_twoDfold_bench_LDADD = $(LDADD)
-perf_twoDfold_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_twoDpfold_bench_SOURCES_DIST = perf/twoDpfold_bench.c
-@WITH_UNIT_TESTS_TRUE@am_perf_twoDpfold_bench_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/twoDpfold_bench.$(OBJEXT)
-perf_twoDpfold_bench_OBJECTS = $(am_perf_twoDpfold_bench_OBJECTS)
-perf_twoDpfold_bench_LDADD = $(LDADD)
-perf_twoDpfold_bench_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
-am__perf_vrna_api_compare_worker_SOURCES_DIST =  \
-	perf/vrna_api_compare_worker.c
-@WITH_UNIT_TESTS_TRUE@am_perf_vrna_api_compare_worker_OBJECTS =  \
-@WITH_UNIT_TESTS_TRUE@	perf/vrna_api_compare_worker.$(OBJEXT)
-perf_vrna_api_compare_worker_OBJECTS =  \
-	$(am_perf_vrna_api_compare_worker_OBJECTS)
-perf_vrna_api_compare_worker_LDADD = $(LDADD)
-perf_vrna_api_compare_worker_DEPENDENCIES =  \
-	$(top_builddir)/src/ViennaRNA/libRNA.la $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
 utils_SOURCES = utils.c
 utils_OBJECTS = utils.$(OBJEXT)
 utils_LDADD = $(LDADD)
@@ -376,23 +227,7 @@ am__depfiles_remade = ./$(DEPDIR)/constraints.Po \
 	./$(DEPDIR)/ensemble_defect.Po ./$(DEPDIR)/eval_structure.Po \
 	./$(DEPDIR)/fold.Po ./$(DEPDIR)/hash_table.Po \
 	./$(DEPDIR)/neighbor.Po ./$(DEPDIR)/utils.Po \
-	./$(DEPDIR)/walk.Po perf/$(DEPDIR)/duplex_bench.Po \
-	perf/$(DEPDIR)/findpath_bench.Po \
-	perf/$(DEPDIR)/heat_capacity_bench.Po \
-	perf/$(DEPDIR)/inverse_bench.Po \
-	perf/$(DEPDIR)/part_func_up_bench.Po \
-	perf/$(DEPDIR)/plex_bench.Po \
-	perf/$(DEPDIR)/rna_window_bench.Po \
-	perf/$(DEPDIR)/rnaalifold_mfe_bench.Po \
-	perf/$(DEPDIR)/rnaalifold_pf_bench.Po \
-	perf/$(DEPDIR)/rnacofold_mfe_bench.Po \
-	perf/$(DEPDIR)/rnacofold_pf_bench.Po \
-	perf/$(DEPDIR)/rnafold_mfe_bench.Po \
-	perf/$(DEPDIR)/rnasubopt_bench.Po \
-	perf/$(DEPDIR)/sampling_bench.Po \
-	perf/$(DEPDIR)/twoDfold_bench.Po \
-	perf/$(DEPDIR)/twoDpfold_bench.Po \
-	perf/$(DEPDIR)/vrna_api_compare_worker.Po
+	./$(DEPDIR)/walk.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -412,40 +247,10 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_1 = 
 SOURCES = constraints.c constraints_soft.c energy_evaluation.c \
 	ensemble_defect.c eval_structure.c fold.c hash_table.c \
-	neighbor.c $(perf_duplex_bench_SOURCES) \
-	$(perf_findpath_bench_SOURCES) \
-	$(perf_heat_capacity_bench_SOURCES) \
-	$(perf_inverse_bench_SOURCES) \
-	$(perf_part_func_up_bench_SOURCES) $(perf_plex_bench_SOURCES) \
-	$(perf_rna_window_bench_SOURCES) \
-	$(perf_rnaalifold_mfe_bench_SOURCES) \
-	$(perf_rnaalifold_pf_bench_SOURCES) \
-	$(perf_rnacofold_mfe_bench_SOURCES) \
-	$(perf_rnacofold_pf_bench_SOURCES) \
-	$(perf_rnafold_mfe_bench_SOURCES) \
-	$(perf_rnasubopt_bench_SOURCES) $(perf_sampling_bench_SOURCES) \
-	$(perf_twoDfold_bench_SOURCES) $(perf_twoDpfold_bench_SOURCES) \
-	$(perf_vrna_api_compare_worker_SOURCES) utils.c walk.c
+	neighbor.c utils.c walk.c
 DIST_SOURCES = constraints.c constraints_soft.c energy_evaluation.c \
 	ensemble_defect.c eval_structure.c fold.c hash_table.c \
-	neighbor.c $(am__perf_duplex_bench_SOURCES_DIST) \
-	$(am__perf_findpath_bench_SOURCES_DIST) \
-	$(am__perf_heat_capacity_bench_SOURCES_DIST) \
-	$(am__perf_inverse_bench_SOURCES_DIST) \
-	$(am__perf_part_func_up_bench_SOURCES_DIST) \
-	$(am__perf_plex_bench_SOURCES_DIST) \
-	$(am__perf_rna_window_bench_SOURCES_DIST) \
-	$(am__perf_rnaalifold_mfe_bench_SOURCES_DIST) \
-	$(am__perf_rnaalifold_pf_bench_SOURCES_DIST) \
-	$(am__perf_rnacofold_mfe_bench_SOURCES_DIST) \
-	$(am__perf_rnacofold_pf_bench_SOURCES_DIST) \
-	$(am__perf_rnafold_mfe_bench_SOURCES_DIST) \
-	$(am__perf_rnasubopt_bench_SOURCES_DIST) \
-	$(am__perf_sampling_bench_SOURCES_DIST) \
-	$(am__perf_twoDfold_bench_SOURCES_DIST) \
-	$(am__perf_twoDpfold_bench_SOURCES_DIST) \
-	$(am__perf_vrna_api_compare_worker_SOURCES_DIST) utils.c \
-	walk.c
+	neighbor.c utils.c walk.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1354,114 +1159,6 @@ hash_table$(EXEEXT): $(hash_table_OBJECTS) $(hash_table_DEPENDENCIES) $(EXTRA_ha
 neighbor$(EXEEXT): $(neighbor_OBJECTS) $(neighbor_DEPENDENCIES) $(EXTRA_neighbor_DEPENDENCIES) 
 	@rm -f neighbor$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(neighbor_OBJECTS) $(neighbor_LDADD) $(LIBS)
-perf/$(am__dirstamp):
-	@$(MKDIR_P) perf
-	@: >>perf/$(am__dirstamp)
-perf/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) perf/$(DEPDIR)
-	@: >>perf/$(DEPDIR)/$(am__dirstamp)
-perf/duplex_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/duplex_bench$(EXEEXT): $(perf_duplex_bench_OBJECTS) $(perf_duplex_bench_DEPENDENCIES) $(EXTRA_perf_duplex_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/duplex_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_duplex_bench_OBJECTS) $(perf_duplex_bench_LDADD) $(LIBS)
-perf/findpath_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/findpath_bench$(EXEEXT): $(perf_findpath_bench_OBJECTS) $(perf_findpath_bench_DEPENDENCIES) $(EXTRA_perf_findpath_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/findpath_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_findpath_bench_OBJECTS) $(perf_findpath_bench_LDADD) $(LIBS)
-perf/heat_capacity_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/heat_capacity_bench$(EXEEXT): $(perf_heat_capacity_bench_OBJECTS) $(perf_heat_capacity_bench_DEPENDENCIES) $(EXTRA_perf_heat_capacity_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/heat_capacity_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_heat_capacity_bench_OBJECTS) $(perf_heat_capacity_bench_LDADD) $(LIBS)
-perf/inverse_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/inverse_bench$(EXEEXT): $(perf_inverse_bench_OBJECTS) $(perf_inverse_bench_DEPENDENCIES) $(EXTRA_perf_inverse_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/inverse_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_inverse_bench_OBJECTS) $(perf_inverse_bench_LDADD) $(LIBS)
-perf/part_func_up_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/part_func_up_bench$(EXEEXT): $(perf_part_func_up_bench_OBJECTS) $(perf_part_func_up_bench_DEPENDENCIES) $(EXTRA_perf_part_func_up_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/part_func_up_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_part_func_up_bench_OBJECTS) $(perf_part_func_up_bench_LDADD) $(LIBS)
-perf/plex_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/plex_bench$(EXEEXT): $(perf_plex_bench_OBJECTS) $(perf_plex_bench_DEPENDENCIES) $(EXTRA_perf_plex_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/plex_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_plex_bench_OBJECTS) $(perf_plex_bench_LDADD) $(LIBS)
-perf/rna_window_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rna_window_bench$(EXEEXT): $(perf_rna_window_bench_OBJECTS) $(perf_rna_window_bench_DEPENDENCIES) $(EXTRA_perf_rna_window_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rna_window_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rna_window_bench_OBJECTS) $(perf_rna_window_bench_LDADD) $(LIBS)
-perf/rnaalifold_mfe_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnaalifold_mfe_bench$(EXEEXT): $(perf_rnaalifold_mfe_bench_OBJECTS) $(perf_rnaalifold_mfe_bench_DEPENDENCIES) $(EXTRA_perf_rnaalifold_mfe_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnaalifold_mfe_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnaalifold_mfe_bench_OBJECTS) $(perf_rnaalifold_mfe_bench_LDADD) $(LIBS)
-perf/rnaalifold_pf_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnaalifold_pf_bench$(EXEEXT): $(perf_rnaalifold_pf_bench_OBJECTS) $(perf_rnaalifold_pf_bench_DEPENDENCIES) $(EXTRA_perf_rnaalifold_pf_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnaalifold_pf_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnaalifold_pf_bench_OBJECTS) $(perf_rnaalifold_pf_bench_LDADD) $(LIBS)
-perf/rnacofold_mfe_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnacofold_mfe_bench$(EXEEXT): $(perf_rnacofold_mfe_bench_OBJECTS) $(perf_rnacofold_mfe_bench_DEPENDENCIES) $(EXTRA_perf_rnacofold_mfe_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnacofold_mfe_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnacofold_mfe_bench_OBJECTS) $(perf_rnacofold_mfe_bench_LDADD) $(LIBS)
-perf/rnacofold_pf_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnacofold_pf_bench$(EXEEXT): $(perf_rnacofold_pf_bench_OBJECTS) $(perf_rnacofold_pf_bench_DEPENDENCIES) $(EXTRA_perf_rnacofold_pf_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnacofold_pf_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnacofold_pf_bench_OBJECTS) $(perf_rnacofold_pf_bench_LDADD) $(LIBS)
-perf/rnafold_mfe_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnafold_mfe_bench$(EXEEXT): $(perf_rnafold_mfe_bench_OBJECTS) $(perf_rnafold_mfe_bench_DEPENDENCIES) $(EXTRA_perf_rnafold_mfe_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnafold_mfe_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnafold_mfe_bench_OBJECTS) $(perf_rnafold_mfe_bench_LDADD) $(LIBS)
-perf/rnasubopt_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/rnasubopt_bench$(EXEEXT): $(perf_rnasubopt_bench_OBJECTS) $(perf_rnasubopt_bench_DEPENDENCIES) $(EXTRA_perf_rnasubopt_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/rnasubopt_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_rnasubopt_bench_OBJECTS) $(perf_rnasubopt_bench_LDADD) $(LIBS)
-perf/sampling_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/sampling_bench$(EXEEXT): $(perf_sampling_bench_OBJECTS) $(perf_sampling_bench_DEPENDENCIES) $(EXTRA_perf_sampling_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/sampling_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_sampling_bench_OBJECTS) $(perf_sampling_bench_LDADD) $(LIBS)
-perf/twoDfold_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/twoDfold_bench$(EXEEXT): $(perf_twoDfold_bench_OBJECTS) $(perf_twoDfold_bench_DEPENDENCIES) $(EXTRA_perf_twoDfold_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/twoDfold_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_twoDfold_bench_OBJECTS) $(perf_twoDfold_bench_LDADD) $(LIBS)
-perf/twoDpfold_bench.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/twoDpfold_bench$(EXEEXT): $(perf_twoDpfold_bench_OBJECTS) $(perf_twoDpfold_bench_DEPENDENCIES) $(EXTRA_perf_twoDpfold_bench_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/twoDpfold_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_twoDpfold_bench_OBJECTS) $(perf_twoDpfold_bench_LDADD) $(LIBS)
-perf/vrna_api_compare_worker.$(OBJEXT): perf/$(am__dirstamp) \
-	perf/$(DEPDIR)/$(am__dirstamp)
-
-perf/vrna_api_compare_worker$(EXEEXT): $(perf_vrna_api_compare_worker_OBJECTS) $(perf_vrna_api_compare_worker_DEPENDENCIES) $(EXTRA_perf_vrna_api_compare_worker_DEPENDENCIES) perf/$(am__dirstamp)
-	@rm -f perf/vrna_api_compare_worker$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(perf_vrna_api_compare_worker_OBJECTS) $(perf_vrna_api_compare_worker_LDADD) $(LIBS)
 
 utils$(EXEEXT): $(utils_OBJECTS) $(utils_DEPENDENCIES) $(EXTRA_utils_DEPENDENCIES) 
 	@rm -f utils$(EXEEXT)
@@ -1473,7 +1170,6 @@ walk$(EXEEXT): $(walk_OBJECTS) $(walk_DEPENDENCIES) $(EXTRA_walk_DEPENDENCIES)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
-	-rm -f perf/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
@@ -1488,23 +1184,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/neighbor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/walk.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/duplex_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/findpath_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/heat_capacity_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/inverse_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/part_func_up_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/plex_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rna_window_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnaalifold_mfe_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnaalifold_pf_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnacofold_mfe_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnacofold_pf_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnafold_mfe_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/rnasubopt_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/sampling_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/twoDfold_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/twoDpfold_bench.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@perf/$(DEPDIR)/vrna_api_compare_worker.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -1541,7 +1220,6 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-	-rm -rf perf/.libs perf/_libs
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -2022,8 +1700,6 @@ clean-generic:
 distclean-generic:
 	-$(am__rm_f) $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || $(am__rm_f) $(CONFIG_CLEAN_VPATH_FILES)
-	-$(am__rm_f) perf/$(DEPDIR)/$(am__dirstamp)
-	-$(am__rm_f) perf/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -2045,23 +1721,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/neighbor.Po
 	-rm -f ./$(DEPDIR)/utils.Po
 	-rm -f ./$(DEPDIR)/walk.Po
-	-rm -f perf/$(DEPDIR)/duplex_bench.Po
-	-rm -f perf/$(DEPDIR)/findpath_bench.Po
-	-rm -f perf/$(DEPDIR)/heat_capacity_bench.Po
-	-rm -f perf/$(DEPDIR)/inverse_bench.Po
-	-rm -f perf/$(DEPDIR)/part_func_up_bench.Po
-	-rm -f perf/$(DEPDIR)/plex_bench.Po
-	-rm -f perf/$(DEPDIR)/rna_window_bench.Po
-	-rm -f perf/$(DEPDIR)/rnaalifold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnaalifold_pf_bench.Po
-	-rm -f perf/$(DEPDIR)/rnacofold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnacofold_pf_bench.Po
-	-rm -f perf/$(DEPDIR)/rnafold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnasubopt_bench.Po
-	-rm -f perf/$(DEPDIR)/sampling_bench.Po
-	-rm -f perf/$(DEPDIR)/twoDfold_bench.Po
-	-rm -f perf/$(DEPDIR)/twoDpfold_bench.Po
-	-rm -f perf/$(DEPDIR)/vrna_api_compare_worker.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -2117,23 +1776,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/neighbor.Po
 	-rm -f ./$(DEPDIR)/utils.Po
 	-rm -f ./$(DEPDIR)/walk.Po
-	-rm -f perf/$(DEPDIR)/duplex_bench.Po
-	-rm -f perf/$(DEPDIR)/findpath_bench.Po
-	-rm -f perf/$(DEPDIR)/heat_capacity_bench.Po
-	-rm -f perf/$(DEPDIR)/inverse_bench.Po
-	-rm -f perf/$(DEPDIR)/part_func_up_bench.Po
-	-rm -f perf/$(DEPDIR)/plex_bench.Po
-	-rm -f perf/$(DEPDIR)/rna_window_bench.Po
-	-rm -f perf/$(DEPDIR)/rnaalifold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnaalifold_pf_bench.Po
-	-rm -f perf/$(DEPDIR)/rnacofold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnacofold_pf_bench.Po
-	-rm -f perf/$(DEPDIR)/rnafold_mfe_bench.Po
-	-rm -f perf/$(DEPDIR)/rnasubopt_bench.Po
-	-rm -f perf/$(DEPDIR)/sampling_bench.Po
-	-rm -f perf/$(DEPDIR)/twoDfold_bench.Po
-	-rm -f perf/$(DEPDIR)/twoDpfold_bench.Po
-	-rm -f perf/$(DEPDIR)/vrna_api_compare_worker.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
