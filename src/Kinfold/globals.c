@@ -1238,17 +1238,20 @@ static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *met
       (pair_table[left - 1] < 0) &&
       (GAV.currform[GSV.hybrid_left] == '.') &&
       kinfold_can_pair_positions_raw(left - 1, GSV.hybrid_left)) {
+    size_t plus1_len;
+
     plus1_structure = strdup(GAV.currform);
     assert(plus1_structure != NULL);
     plus1_structure[left - 1] = '(';
     plus1_structure[GSV.hybrid_left] = ')';
 
-    plus1_seq = (char *)calloc((size_t)(GSV.hybrid_left - left + 2), sizeof(char));
-    plus1_struc = (char *)calloc((size_t)(GSV.hybrid_left - left + 2), sizeof(char));
+    plus1_len = (size_t)(GSV.hybrid_left - (left - 1) + 1);
+    plus1_seq = (char *)calloc(plus1_len + 1, sizeof(char));
+    plus1_struc = (char *)calloc(plus1_len + 1, sizeof(char));
     assert(plus1_seq != NULL);
     assert(plus1_struc != NULL);
-    memcpy(plus1_seq, GAV.farbe + left - 1, (size_t)(GSV.hybrid_left - left + 2));
-    memcpy(plus1_struc, plus1_structure + left - 1, (size_t)(GSV.hybrid_left - left + 2));
+    memcpy(plus1_seq, GAV.farbe + left - 1, plus1_len);
+    memcpy(plus1_struc, plus1_structure + left - 1, plus1_len);
     metrics->terminal_hairpin_plus1_energy =
       (double)eval_substructure_dcal(plus1_seq, plus1_struc) / 100.0;
     metrics->plus1_ddg =
