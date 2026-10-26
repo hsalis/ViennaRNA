@@ -149,7 +149,7 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
-ISODATE = 2026-04-08
+ISODATE = 2026-05-21
 LDFLAGS = 
 LIBOBJS = 
 LIBS = -lm 
@@ -160,10 +160,10 @@ OBJEXT = o
 PACKAGE = Kinfold
 PACKAGE_BUGREPORT = rna@tbi.univie.ac.at
 PACKAGE_NAME = kinfold
-PACKAGE_STRING = kinfold 1.4
+PACKAGE_STRING = kinfold 1.4.2
 PACKAGE_TARNAME = Kinfold
 PACKAGE_URL = 
-PACKAGE_VERSION = 1.4
+PACKAGE_VERSION = 1.4.2
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/local/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -171,7 +171,7 @@ PKG_CONFIG_PATH =
 SET_MAKE = 
 SHELL = /bin/sh
 STRIP = 
-VERSION = 1.4
+VERSION = 1.4.2
 VRNA2_CFLAGS = 
 VRNA2_LIBS = 
 VRNA_CFLAGS = -I$(top_srcdir)/../../src/ViennaRNA -I$(top_srcdir)/../../src -DVRNA_WITH_NAVIEW_LAYOUT -DVRNA_LOG_NO_DEBUG_RNALIB
@@ -244,9 +244,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu Example/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign Example/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu Example/Makefile
+	  $(AUTOMAKE) --foreign Example/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \

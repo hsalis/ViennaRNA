@@ -9,6 +9,8 @@
 #ifndef NACHBAR_H
 #define NACHBAR_H
 
+#include "globals.h"
+
 /* used in baum.c */
 extern void ini_nbList(int chords);
 extern void update_nbList(int i,int j, int iE);
@@ -18,4 +20,5 @@ extern int sel_nb(void);
 extern void clean_up_nbList(void);
 
 extern char kinfold_move_char(int next);
+extern void kinfold_get_interval_metrics_for_time(double time_value, KinfoldIntervalMetrics *metrics);
 #endif

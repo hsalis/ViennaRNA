@@ -236,6 +236,7 @@ kinfold_run_with_args(int               argc,
 
   for (i = 0; i < GSV.num; i++) {
     GTV.rect = rect;
+    GSV.trajectory_index = i;
 
     ini_or_reset_rl();
     if (!kinfold_transcription_enabled() && GSV.grow > 0) {
@@ -338,17 +339,46 @@ ensure_step_capacity(kinfold_trajectory_t *trajectory,
 
 
 static void
+seed_interval_from_current_step(kinfold_step_t *step)
+{
+  if (!step)
+    return;
+
+  step->min_rna_energy = step->max_rna_energy = step->energy;
+  step->min_hybrid_energy = step->max_hybrid_energy = step->total_energy - step->energy;
+  step->min_dna_duplex_energy = step->max_dna_duplex_energy = step->dna_duplex_energy;
+  step->min_total_energy = step->max_total_energy = step->total_energy;
+  step->min_terminal_hairpin_energy = step->max_terminal_hairpin_energy = step->terminal_hairpin_energy;
+  step->min_terminal_hairpin_dg_dt = step->max_terminal_hairpin_dg_dt = step->terminal_hairpin_dg_dt;
+  step->min_terminal_hairpin_plus1_energy = step->max_terminal_hairpin_plus1_energy = step->terminal_hairpin_plus1_energy;
+  step->min_rna_dna_minus1_ddg = step->max_rna_dna_minus1_ddg = step->rna_dna_minus1_ddg;
+  step->min_plus1_ddg = step->max_plus1_ddg = step->plus1_ddg;
+  step->min_exit_channel_bp_count = step->max_exit_channel_bp_count = (double)step->exit_channel_bp_count;
+  step->min_terminal_energy = step->max_terminal_energy = step->terminal_energy;
+  step->min_folding_inside_channel_energy = step->max_folding_inside_channel_energy = step->folding_inside_channel_energy;
+  step->min_elongation_rate_current = step->max_elongation_rate_current = step->elongation_rate_current;
+  step->min_rna_dna_1nt_shift_energy = step->max_rna_dna_1nt_shift_energy = step->rna_dna_1nt_shift_energy;
+  step->min_invasion_1nt_energy = step->max_invasion_1nt_energy = step->invasion_1nt_energy;
+  step->min_invasion_2nt_energy = step->max_invasion_2nt_energy = step->invasion_2nt_energy;
+  step->min_rloop_1nt_energy = step->max_rloop_1nt_energy = step->rloop_1nt_energy;
+  step->min_rloop_2nt_energy = step->max_rloop_2nt_energy = step->rloop_2nt_energy;
+}
+
+
+static void
 capture_step_at_time(kinfold_trajectory_t *trajectory,
                      char                 move,
                      double               time_value)
 {
   kinfold_step_t *step;
   KinfoldInformationalMetrics metrics;
+  KinfoldIntervalMetrics interval_metrics;
 
   kinfold_prepare_sample_metrics(time_value);
   ensure_step_capacity(trajectory, trajectory->step_count + 1);
   step = &(trajectory->steps[trajectory->step_count++]);
   kinfold_get_sample_metrics(&metrics);
+  kinfold_get_interval_metrics_for_time(time_value, &interval_metrics);
 
   step->time              = time_value;
   step->transcribed_length = GSV.tx_len;
@@ -360,6 +390,53 @@ capture_step_at_time(kinfold_trajectory_t *trajectory,
   step->terminal_hairpin_plus1_energy = metrics.terminal_hairpin_plus1_energy;
   step->rna_dna_minus1_ddg = metrics.rna_dna_minus1_ddg;
   step->plus1_ddg = metrics.plus1_ddg;
+  step->exit_channel_left = kinfold_channel_left();
+  step->exit_channel_length = kinfold_channel_length();
+  step->exit_channel_bp_count = metrics.exit_channel_bp_count;
+  step->terminal_energy = metrics.terminal_energy;
+  step->folding_inside_channel_energy = metrics.folding_inside_channel_energy;
+  step->elongation_rate_current = metrics.elongation_rate_current;
+  step->rna_dna_1nt_shift_energy = metrics.rna_dna_1nt_shift_energy;
+  step->invasion_1nt_energy = metrics.invasion_1nt_energy;
+  step->invasion_2nt_energy = metrics.invasion_2nt_energy;
+  step->rloop_1nt_energy = metrics.rloop_1nt_energy;
+  step->rloop_2nt_energy = metrics.rloop_2nt_energy;
+  step->min_rna_energy = interval_metrics.min_rna_energy;
+  step->max_rna_energy = interval_metrics.max_rna_energy;
+  step->min_hybrid_energy = interval_metrics.min_hybrid_energy;
+  step->max_hybrid_energy = interval_metrics.max_hybrid_energy;
+  step->min_dna_duplex_energy = interval_metrics.min_dna_duplex_energy;
+  step->max_dna_duplex_energy = interval_metrics.max_dna_duplex_energy;
+  step->min_total_energy = interval_metrics.min_total_energy;
+  step->max_total_energy = interval_metrics.max_total_energy;
+  step->min_terminal_hairpin_energy = interval_metrics.min_terminal_hairpin_energy;
+  step->max_terminal_hairpin_energy = interval_metrics.max_terminal_hairpin_energy;
+  step->min_terminal_hairpin_dg_dt = interval_metrics.min_terminal_hairpin_dg_dt;
+  step->max_terminal_hairpin_dg_dt = interval_metrics.max_terminal_hairpin_dg_dt;
+  step->min_terminal_hairpin_plus1_energy = interval_metrics.min_terminal_hairpin_plus1_energy;
+  step->max_terminal_hairpin_plus1_energy = interval_metrics.max_terminal_hairpin_plus1_energy;
+  step->min_rna_dna_minus1_ddg = interval_metrics.min_rna_dna_minus1_ddg;
+  step->max_rna_dna_minus1_ddg = interval_metrics.max_rna_dna_minus1_ddg;
+  step->min_plus1_ddg = interval_metrics.min_plus1_ddg;
+  step->max_plus1_ddg = interval_metrics.max_plus1_ddg;
+  step->min_exit_channel_bp_count = interval_metrics.min_exit_channel_bp_count;
+  step->max_exit_channel_bp_count = interval_metrics.max_exit_channel_bp_count;
+  step->min_terminal_energy = interval_metrics.min_terminal_energy;
+  step->max_terminal_energy = interval_metrics.max_terminal_energy;
+  step->min_folding_inside_channel_energy = interval_metrics.min_folding_inside_channel_energy;
+  step->max_folding_inside_channel_energy = interval_metrics.max_folding_inside_channel_energy;
+  step->min_elongation_rate_current = interval_metrics.min_elongation_rate_current;
+  step->max_elongation_rate_current = interval_metrics.max_elongation_rate_current;
+  step->min_rna_dna_1nt_shift_energy = interval_metrics.min_rna_dna_1nt_shift_energy;
+  step->max_rna_dna_1nt_shift_energy = interval_metrics.max_rna_dna_1nt_shift_energy;
+  step->min_invasion_1nt_energy = interval_metrics.min_invasion_1nt_energy;
+  step->max_invasion_1nt_energy = interval_metrics.max_invasion_1nt_energy;
+  step->min_invasion_2nt_energy = interval_metrics.min_invasion_2nt_energy;
+  step->max_invasion_2nt_energy = interval_metrics.max_invasion_2nt_energy;
+  step->min_rloop_1nt_energy = interval_metrics.min_rloop_1nt_energy;
+  step->max_rloop_1nt_energy = interval_metrics.max_rloop_1nt_energy;
+  step->min_rloop_2nt_energy = interval_metrics.min_rloop_2nt_energy;
+  step->max_rloop_2nt_energy = interval_metrics.max_rloop_2nt_energy;
   step->bubble_length     = GSV.bubble_width;
   step->bubble_left       = GSV.bubble_left;
   step->hybrid_length     = GSV.hybrid_len;
@@ -367,6 +444,8 @@ capture_step_at_time(kinfold_trajectory_t *trajectory,
   step->move              = move;
   step->structure         = strdup(kinfold_full_structure_state());
   step->sequence_state    = strdup(kinfold_full_sequence_state());
+  if (!interval_metrics.initialized)
+    seed_interval_from_current_step(step);
 }
 
 

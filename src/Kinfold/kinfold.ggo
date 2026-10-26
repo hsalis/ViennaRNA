@@ -28,11 +28,14 @@ option  "glen"    -  "initial size of growing chain" int default="15"
 option  "transcription_elongation_rate" - "set transcription elongation rate in nucleotides per second" double default="0"
 option  "kinfold_seconds_per_time_unit" - "set physical seconds represented by one Kinfold time unit" double default="1e-5"
 option  "max_bubble_width" - "set maximum transcription bubble width in nucleotides" int default="0"
+option  "RNAP_exit_channel_length" - "set RNAP RNA exit-channel length in nucleotides" int default="20"
 option  "dump_transcription_neighbors" - "debug: dump transcription/bubble neighbor sets to stderr" flag off hidden
 option  "phi"     -  "set phi value" double hidden
 option  "pbounds" -  "specify 3 floats for phi_min, phi_inc, phi_max in the form <d1=d2=d3>" string hidden
 section "Output"
 option  "log"     -  "set basename of log-file" string typestr="filename" default="kinout"
+option  "csv-output" - "write sampled trajectory states and metrics to CSV file" string typestr="filename"
+option  "structure-time-only" - "print sequence once, then only RNA structure and time to stdout" flag off
 option  "silent"  q  "no output to stdout" flag off
 option  "verbose" v  "more information to stdout" flag off
 option  "lmin"    -  "output only local minima to stdout" flag off

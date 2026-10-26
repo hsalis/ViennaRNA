@@ -15,6 +15,7 @@
 #include <getopt.h>
 #include <float.h>
 #include <math.h>
+#include <ctype.h>
 
 #if HAVE_LIBRNA_API3
 #include <ViennaRNA/utils.h>
@@ -51,14 +52,32 @@ static void process_options_gg (int argc, char *argv[]);
 static const char *costring(const char *str);
 static void derive_template_dna(void);
 static void update_transcription_mode_defaults(void);
+static void update_exit_channel_state(void);
 static void normalize_transcription_start_structure(void);
 static int  is_transcribed_position(int idx0);
 static char dna_complement(char rna_nt);
+static char coding_dna_nt(int idx0);
 static int  hybrid_segment_energy_dcal(int left, int len);
+static int  hybrid_shifted_upstream_energy_dcal(int left, int len, int *supported);
 static int  dna_duplex_segment_energy_dcal(int left, int len);
 static int  eval_substructure_dcal(const char *sequence, const char *structure);
 static int  build_pair_table(const char *structure, int len, int *pair_table, int *parent_open);
 static int  compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *metrics);
+static int  build_substructure_with_outside_pairs_dotted(const char *sequence,
+                                                         const char *structure,
+                                                         int        left,
+                                                         int        right,
+                                                         char       **subseq,
+                                                         char       **substruc);
+static int  pair_crosses_existing(const int *pair_table, int len, int i, int j);
+static int  evaluate_invasion_energy(int invade_count);
+static double terminal_component_energy_for_structure(const char *structure);
+static int rewound_dna_duplex_energy_dcal(int released_hybrid_nts);
+static double evaluate_rloop_terminal_plus_energy(int pair_count, int *found);
+static double pause_rate_scale_for_state(void);
+static int position_in_exit_channel(int idx0);
+static int exit_channel_left_state(void);
+static int exit_channel_right_state(void);
 static const char *full_sequence_state(void);
 static const char *full_structure_state(void);
 static const char *full_structure_state_from(const char *structure);
@@ -68,7 +87,6 @@ static char UNUSED rcsid[] ="$Id: globals.c,v 1.8 2008/10/07 09:03:14 ivo Exp $"
 static KinfoldInformationalMetrics current_sample_metrics;
 static double sample_metrics_time = 0.0;
 static double sample_metrics_smoothed_hairpin = 0.0;
-static double sample_metrics_previous_smoothed = 0.0;
 static int sample_metrics_ready = 0;
 static int sample_metrics_initialized = 0;
 #define MAXMSG 8
@@ -123,6 +141,7 @@ void clean_up_globals(void) {
   int i;
   free(GAV.ProgramName);
   free(GAV.BaseName);
+  free(GAV.CSVOutputFile);
   free(GAV.farbe);
   free(GAV.farbe_full);
   free(GAV.template_dna_full);
@@ -173,6 +192,8 @@ static void usage(int status) {
 	  "                        physical seconds per Kinfold time unit\n"
 	  "  --max_bubble_width <int>\n"
 	  "                        maximum transcription bubble width\n"
+	  "  --RNAP_exit_channel_length <int>\n"
+	  "                        RNAP RNA exit-channel length in nucleotides\n"
 	  "  --phi <double>        set phi value to <double>\n"
 	  "  --pbounds <d1=d2=d3>  set phi_min to d1\n"
 	  "                            phi_inc to d2\n"
@@ -180,6 +201,10 @@ static void usage(int status) {
 	  "                            (d? is a double value)\n"
 	  " Output\n"
 	  "  --log <string>  set basename of log-file to <string>\n"
+	  "  --csv-output <string>\n"
+	  "                  write sampled trajectory states and metrics to CSV file\n"
+	  "  --structure-time-only\n"
+	  "                  print sequence once, then only structure and time to stdout\n"
 	  "  --err <string>  set basename of error-log-file to <string>\n"
 	  "  --silent        no output to stdout\n"
 	  "  --verbose       more information to stdout\n"
@@ -207,9 +232,9 @@ void log_prog_params(FILE *FP) {
 	     "#EnergyModel: dangle=%d Temp=%.1f logML=%s Par=%s\n"
 	     "#MoveSet: noShift=%s noLP=%s\n"
 	     "#Simulation: num=%d time=%.2f time_step=%.2f seed=%s fpt=%s rect=%s mc=%s\n"
-	     "#Simulation: transcription=%s elongation_rate_nt_s=%.6g seconds_per_time_unit=%.6g max_bubble_width=%d tx_len=%d bubble=[%d,%d) hybrid=[%d,%d)\n"
+	     "#Simulation: transcription=%s elongation_rate_nt_s=%.6g seconds_per_time_unit=%.6g max_bubble_width=%d exit_channel_length=%d tx_len=%d bubble=[%d,%d) hybrid=[%d,%d) channel=[%d,%d)\n"
 	     "#Simulation: phi=%g pbounds=%s\n"
-	     "#Output: log=%s silent=%s lmin=%s cut=%s",
+	     "#Output: log=%s csv=%s structure_time_only=%s silent=%s lmin=%s cut=%s",
 	     time_stamp(),
 	     GTV.dangle,
 	     GSV.Temp,
@@ -228,14 +253,19 @@ void log_prog_params(FILE *FP) {
 	     GSV.transcription_elongation_rate_nt_per_s,
 	     GSV.seconds_per_internal_time_unit,
 	     GSV.max_bubble_width,
+	     GSV.RNAP_exit_channel_length,
 	     GSV.tx_len,
 	     GSV.bubble_left,
 	     GSV.bubble_left + GSV.bubble_width,
 	     GSV.hybrid_left,
 	     GSV.hybrid_left + GSV.hybrid_len,
+	     GSV.channel_left,
+	     GSV.channel_left + GSV.channel_length,
 	     GSV.phi,
 	     verbose(GTV.phi, "pbounds"),
 	     GAV.BaseName,
+	     GAV.CSVOutputFile,
+	     verbose(GTV.structure_time_only, NULL),
 	     verbose(GTV.silent, NULL),
 	     verbose(GTV.lmin, NULL),
 	     cut_value ? cut_value : "");
@@ -294,11 +324,14 @@ static void display_settings(void) {
 	  "  --transcription_elongation_rate = %.6g\n"
 	  "  --kinfold_seconds_per_time_unit = %.6g\n"
 	  "  --max_bubble_width = %d\n"
-	  "  --fpt     = %s\n"
-	  "  --rect     = %s\n"
-	  " Output\n"
-	  "  --log     = %s\n"
-	  "  --silent  = %s\n"
+	  "  --RNAP_exit_channel_length = %d\n"
+		  "  --fpt     = %s\n"
+		  "  --rect     = %s\n"
+		  " Output\n"
+		  "  --log     = %s\n"
+		  "  --csv-output = %s\n"
+		  "  --structure-time-only = %s\n"
+		  "  --silent  = %s\n"
 	  "  --verbose = %s\n"
 	  "  --lmin    = %s\n"
 	  "  --cut     = %s",
@@ -320,10 +353,13 @@ static void display_settings(void) {
 	  GSV.transcription_elongation_rate_nt_per_s,
 	  GSV.seconds_per_internal_time_unit,
 	  GSV.max_bubble_width,
-	  verbose(GTV.fpt, NULL),
-	  verbose(GTV.rect, NULL),
-	  GAV.BaseName,
-	  verbose(GTV.silent, NULL),
+	  GSV.RNAP_exit_channel_length,
+		  verbose(GTV.fpt, NULL),
+		  verbose(GTV.rect, NULL),
+		  GAV.BaseName,
+		  GAV.CSVOutputFile,
+		  verbose(GTV.structure_time_only, NULL),
+		  verbose(GTV.silent, NULL),
 	  verbose(GTV.verbose, NULL),
 	  verbose(GTV.lmin, NULL),
 	  (GSV.cut >= (float)(DBL_MAX / 2.0)) ? "inf" : "");
@@ -393,6 +429,8 @@ static void process_options_gg (int argc, char *argv[]) {
   GSV.Temp = args_info.Temp_arg;
   if (args_info.Par_given) 
     strncpy(GAV.ParamFile,args_info.Par_arg,255);
+  if (args_info.csv_output_given)
+    strncpy(GAV.CSVOutputFile, args_info.csv_output_arg, 255);
   GTV.Par = args_info.Par_given;
   GTV.logML = args_info.logML_flag;
 
@@ -405,6 +443,7 @@ static void process_options_gg (int argc, char *argv[]) {
   GTV.lmin = args_info.lmin_flag;
 
   GTV.verbose = args_info.verbose_flag;
+  GTV.structure_time_only = args_info.structure_time_only_flag;
   GTV.silent = (GTV.verbose==0)?
     args_info.silent_flag : 0;
   if (args_info.seed_given)
@@ -453,6 +492,7 @@ static void process_options_gg (int argc, char *argv[]) {
   GSV.transcription_elongation_rate_nt_per_s = args_info.transcription_elongation_rate_arg;
   GSV.seconds_per_internal_time_unit = args_info.kinfold_seconds_per_time_unit_arg;
   GSV.max_bubble_width = args_info.max_bubble_width_arg;
+  GSV.RNAP_exit_channel_length = args_info.RNAP_exit_channel_length_arg;
   GTV.lmin = args_info.lmin_flag;
   GTV.fpt  = args_info.fpt_flag;
   GTV.rect = args_info.rect_flag;
@@ -467,6 +507,12 @@ static void process_options_gg (int argc, char *argv[]) {
     fprintf(stderr,
             "Value of --max_bubble_width must be >= 0 >%d<\n",
             GSV.max_bubble_width);
+    exit(EXIT_FAILURE);
+  }
+  if (GSV.RNAP_exit_channel_length < 0) {
+    fprintf(stderr,
+            "Value of --RNAP_exit_channel_length must be >= 0 >%d<\n",
+            GSV.RNAP_exit_channel_length);
     exit(EXIT_FAILURE);
   }
   if (GSV.transcription_elongation_rate_nt_per_s < 0.0) {
@@ -649,6 +695,7 @@ static void ini_gtoggles(void) {
   GTV.mc = 0;
   GTV.transcription = 0;
   GTV.max_bubble = 0;
+  GTV.structure_time_only = 0;
   GTV.dump_transcription_neighbors = 0;
 }
 
@@ -656,6 +703,7 @@ static void ini_gtoggles(void) {
 static void ini_gvars(void) {
   GSV.len = 0;
   GSV.num = 1;
+  GSV.trajectory_index = 0;
   GSV.maxS = 99;
   GSV.cut = (float)DBL_MAX;
   GSV.Temp = 37.0;
@@ -672,9 +720,14 @@ static void ini_gvars(void) {
   GSV.grow = 0.0;
   GSV.full_len = 0;
   GSV.tx_len = 0;
+  GSV.RNAP_exit_channel_length = 20;
+  GSV.channel_left = 0;
+  GSV.channel_length = 0;
   GSV.transcription_elongation_rate_nt_per_s = 0.0;
   GSV.seconds_per_internal_time_unit = 1e-5;
   GSV.elongation_propensity_internal = 0.0;
+  GSV.elongation_rate_current_nt_per_s = 0.0;
+  GSV.elongation_propensity_internal_current = 0.0;
   GSV.max_bubble_width = 0;
   GSV.bubble_left = 0;
   GSV.bubble_width = 0;
@@ -692,6 +745,9 @@ static void ini_garrays(void) {
   GAV.BaseName    = (char *)calloc((size_t)256, sizeof(char));
   assert(GAV.BaseName != NULL);
   strcpy(GAV.BaseName, "kinout");
+  GAV.CSVOutputFile = (char *)calloc((size_t)256, sizeof(char));
+  assert(GAV.CSVOutputFile != NULL);
+  strcpy(GAV.CSVOutputFile, "");
   GAV.stopform = (char **)calloc(GSV.maxS + 1, sizeof(char *));
   assert(GAV.stopform != NULL);
   GAV.farbe = NULL;
@@ -725,9 +781,11 @@ const char *kinfold_cli_structure_state(void) {
   static char *buffer = NULL;
   static int  size = 0;
   const char  *state;
+  int         channel_left;
   int         right;
 
   state = full_structure_state();
+  update_exit_channel_state();
 
   if ((!GTV.transcription) || (!kinfold_bubble_enabled()) || (GSV.bubble_width <= 0))
     return state;
@@ -738,6 +796,12 @@ const char *kinfold_cli_structure_state(void) {
   }
 
   memcpy(buffer, state, (size_t)GSV.full_len + 1);
+
+  channel_left = exit_channel_left_state();
+  if ((channel_left >= 0) &&
+      (channel_left < GSV.full_len) &&
+      (channel_left < GSV.bubble_left))
+    buffer[channel_left] = 'c';
 
   if ((GSV.bubble_left >= 0) && (GSV.bubble_left < GSV.full_len))
     buffer[GSV.bubble_left] = 'b';
@@ -785,51 +849,105 @@ double kinfold_current_total_energy(void) {
   return GSV.currE + kinfold_current_hybrid_energy();
 }
 
+double kinfold_current_elongation_rate(void) {
+  if (!kinfold_transcription_enabled() || (GSV.transcription_elongation_rate_nt_per_s <= 0.0))
+    return 0.0;
+
+  update_exit_channel_state();
+  GSV.elongation_rate_current_nt_per_s =
+    GSV.transcription_elongation_rate_nt_per_s * pause_rate_scale_for_state();
+  return GSV.elongation_rate_current_nt_per_s;
+}
+
+double kinfold_current_elongation_propensity(void) {
+  GSV.elongation_propensity_internal_current =
+    kinfold_current_elongation_rate() * GSV.seconds_per_internal_time_unit;
+  return GSV.elongation_propensity_internal_current;
+}
+
+int kinfold_channel_left(void) {
+  update_exit_channel_state();
+  return GSV.channel_left;
+}
+
+int kinfold_channel_length(void) {
+  update_exit_channel_state();
+  return GSV.channel_length;
+}
+
 void kinfold_reset_sample_metrics(void) {
   memset(&current_sample_metrics, 0, sizeof(current_sample_metrics));
   sample_metrics_time = 0.0;
   sample_metrics_smoothed_hairpin = 0.0;
-  sample_metrics_previous_smoothed = 0.0;
   sample_metrics_ready = 0;
   sample_metrics_initialized = 0;
 }
 
-void kinfold_prepare_sample_metrics(double sample_time) {
-  KinfoldInformationalMetrics raw_metrics;
-  double dt, tau, alpha, smoothed;
-
-  if (sample_metrics_ready && (fabs(sample_time - sample_metrics_time) <= 1e-9))
+void kinfold_metric_smoother_reset(KinfoldMetricSmootherState *state) {
+  if (!state)
     return;
+
+  state->last_time = 0.0;
+  state->smoothed_terminal_hairpin = 0.0;
+  state->initialized = 0;
+}
+
+void kinfold_compute_metrics_for_time(double                    time_value,
+                                      KinfoldMetricSmootherState *state,
+                                      KinfoldInformationalMetrics *metrics) {
+  KinfoldInformationalMetrics raw_metrics;
+  double dt, tau, alpha, smoothed, previous_smoothed;
+
+  if (!metrics)
+    return;
+
+  memset(metrics, 0, sizeof(*metrics));
 
   memset(&raw_metrics, 0, sizeof(raw_metrics));
   compute_terminal_hairpin_metrics_raw(&raw_metrics);
-  current_sample_metrics = raw_metrics;
+  *metrics = raw_metrics;
 
-  if ((!sample_metrics_initialized) || (sample_time <= sample_metrics_time)) {
-    current_sample_metrics.terminal_hairpin_dg_dt = 0.0;
-    sample_metrics_smoothed_hairpin = raw_metrics.terminal_hairpin_energy;
-    sample_metrics_previous_smoothed = sample_metrics_smoothed_hairpin;
-    sample_metrics_initialized = 1;
+  if ((!state) || (!state->initialized) || (time_value <= state->last_time)) {
+    metrics->terminal_hairpin_dg_dt = 0.0;
+    if (state) {
+      state->smoothed_terminal_hairpin = raw_metrics.terminal_hairpin_energy;
+      state->last_time = time_value;
+      state->initialized = 1;
+    }
   } else {
-    dt = sample_time - sample_metrics_time;
+    dt = time_value - state->last_time;
     if (dt <= 0.0) {
-      current_sample_metrics.terminal_hairpin_dg_dt = 0.0;
+      metrics->terminal_hairpin_dg_dt = 0.0;
     } else {
       tau = 5.0 * GSV.time_step;
       if (tau <= 0.0)
         tau = 1.0;
       alpha = 1.0 - exp(-dt / tau);
-      sample_metrics_previous_smoothed = sample_metrics_smoothed_hairpin;
+      previous_smoothed = state->smoothed_terminal_hairpin;
       smoothed = alpha * raw_metrics.terminal_hairpin_energy +
-                 (1.0 - alpha) * sample_metrics_previous_smoothed;
-      current_sample_metrics.terminal_hairpin_dg_dt =
-        (smoothed - sample_metrics_previous_smoothed) / dt;
-      sample_metrics_smoothed_hairpin = smoothed;
+                 (1.0 - alpha) * previous_smoothed;
+      metrics->terminal_hairpin_dg_dt =
+        (smoothed - previous_smoothed) / dt;
+      state->smoothed_terminal_hairpin = smoothed;
     }
+    state->last_time = time_value;
   }
+}
 
+void kinfold_prepare_sample_metrics(double sample_time) {
+  KinfoldMetricSmootherState state;
+
+  if (sample_metrics_ready && (fabs(sample_time - sample_metrics_time) <= 1e-9))
+    return;
+
+  state.last_time = sample_metrics_time;
+  state.smoothed_terminal_hairpin = sample_metrics_smoothed_hairpin;
+  state.initialized = sample_metrics_initialized;
+  kinfold_compute_metrics_for_time(sample_time, &state, &current_sample_metrics);
   sample_metrics_time = sample_time;
+  sample_metrics_smoothed_hairpin = state.smoothed_terminal_hairpin;
   sample_metrics_ready = 1;
+  sample_metrics_initialized = state.initialized;
 }
 
 void kinfold_get_sample_metrics(KinfoldInformationalMetrics *metrics) {
@@ -853,6 +971,29 @@ int kinfold_stop_matches(const char *stopform) {
   }
 
   return (strcmp(stopform, current) == 0);
+}
+
+static void update_exit_channel_state(void) {
+  int left, right;
+
+  if (!kinfold_bubble_enabled() || (GSV.RNAP_exit_channel_length <= 0) || (GSV.bubble_left <= 0)) {
+    GSV.channel_left = GSV.bubble_left;
+    GSV.channel_length = 0;
+    return;
+  }
+
+  left = GSV.bubble_left - GSV.RNAP_exit_channel_length;
+  if (left < 0)
+    left = 0;
+  right = GSV.bubble_left - 1;
+  if (right < left) {
+    GSV.channel_left = GSV.bubble_left;
+    GSV.channel_length = 0;
+    return;
+  }
+
+  GSV.channel_left = left;
+  GSV.channel_length = right - left + 1;
 }
 
 static const char *costring(const char *str) {
@@ -913,9 +1054,13 @@ static void update_transcription_mode_defaults(void) {
     GTV.transcription = 1;
     GSV.elongation_propensity_internal =
       GSV.transcription_elongation_rate_nt_per_s * GSV.seconds_per_internal_time_unit;
+    GSV.elongation_rate_current_nt_per_s = GSV.transcription_elongation_rate_nt_per_s;
+    GSV.elongation_propensity_internal_current = GSV.elongation_propensity_internal;
   } else {
     GTV.transcription = 0;
     GSV.elongation_propensity_internal = 0.0;
+    GSV.elongation_rate_current_nt_per_s = 0.0;
+    GSV.elongation_propensity_internal_current = 0.0;
   }
 
   GTV.max_bubble = (GTV.transcription && (GSV.max_bubble_width > 0)) ? 1 : 0;
@@ -925,6 +1070,7 @@ static void update_transcription_mode_defaults(void) {
     GSV.hybrid_left = 0;
     GSV.hybrid_len = 0;
   }
+  update_exit_channel_state();
 }
 
 static void normalize_transcription_start_structure(void) {
@@ -981,6 +1127,18 @@ static char dna_complement(char rna_nt) {
   }
 }
 
+static char coding_dna_nt(int idx0) {
+  char nt;
+
+  if (!GAV.farbe_full || (idx0 < 0) || (idx0 >= GSV.full_len))
+    return 'N';
+
+  nt = GAV.farbe_full[idx0];
+  if (nt == 'U')
+    return 'T';
+  return nt;
+}
+
 static int hybrid_segment_energy_dcal(int left, int len) {
   int energy = 0;
   int i;
@@ -989,6 +1147,69 @@ static int hybrid_segment_energy_dcal(int left, int len) {
     return 0;
 
   for (i = left; i < left + len - 1; i++) {
+    const char *step = GAV.template_dna_full + i;
+
+    switch (step[0]) {
+      case 'T':
+        switch (step[1]) {
+          case 'T': energy += -70; break;
+          case 'G': energy += -120; break;
+          case 'C': energy += -150; break;
+          case 'A': energy += -50; break;
+        }
+        break;
+      case 'G':
+        switch (step[1]) {
+          case 'T': energy += -150; break;
+          case 'G': energy += -170; break;
+          case 'C': energy += -200; break;
+          case 'A': energy += -140; break;
+        }
+        break;
+      case 'C':
+        switch (step[1]) {
+          case 'T': energy += -130; break;
+          case 'G': energy += -140; break;
+          case 'C': energy += -230; break;
+          case 'A': energy += -160; break;
+        }
+        break;
+      case 'A':
+        switch (step[1]) {
+          case 'T': energy += -40; break;
+          case 'G': energy += -40; break;
+          case 'C': energy += -140; break;
+          case 'A': energy += 20; break;
+        }
+        break;
+    }
+  }
+
+  return energy;
+}
+
+static int hybrid_shifted_upstream_energy_dcal(int left, int len, int *supported) {
+  int energy = 0;
+  int i;
+
+  if (supported)
+    *supported = 0;
+
+  if (!GAV.template_dna_full || !GAV.farbe_full || (len <= 1))
+    return 0;
+
+  if ((left < 0) || ((left + len - 1) >= GSV.full_len))
+    return 0;
+
+  for (i = left; i < left + len - 1; i++) {
+    if (dna_complement(GAV.farbe_full[i + 1]) != GAV.template_dna_full[i])
+      return 0;
+  }
+
+  if (supported)
+    *supported = 1;
+
+  for (i = left; i < left + len - 2; i++) {
     const char *step = GAV.template_dna_full + i;
 
     switch (step[0]) {
@@ -1163,11 +1384,446 @@ static int build_pair_table(const char *structure, int len, int *pair_table, int
   return (top == -1) ? 1 : 0;
 }
 
+static int build_substructure_with_outside_pairs_dotted(const char *sequence,
+                                                        const char *structure,
+                                                        int        left,
+                                                        int        right,
+                                                        char       **subseq,
+                                                        char       **substruc) {
+  int i;
+  int sublen;
+  int *pair_table, *parent_open;
+
+  if ((!sequence) || (!structure) || (!subseq) || (!substruc) || (left < 0) || (right < left))
+    return 0;
+
+  sublen = right - left + 1;
+  pair_table = (int *)calloc((size_t)GSV.len, sizeof(int));
+  parent_open = (int *)calloc((size_t)GSV.len, sizeof(int));
+  assert(pair_table != NULL);
+  assert(parent_open != NULL);
+
+  if (!build_pair_table(structure, GSV.len, pair_table, parent_open)) {
+    free(pair_table);
+    free(parent_open);
+    return 0;
+  }
+
+  *subseq = (char *)calloc((size_t)sublen + 1, sizeof(char));
+  *substruc = (char *)calloc((size_t)sublen + 1, sizeof(char));
+  assert(*subseq != NULL);
+  assert(*substruc != NULL);
+  memcpy(*subseq, sequence + left, (size_t)sublen);
+  memcpy(*substruc, structure + left, (size_t)sublen);
+
+  for (i = left; i <= right; i++) {
+    int partner = pair_table[i];
+
+    if ((partner >= 0) && ((partner < left) || (partner > right)))
+      (*substruc)[i - left] = '.';
+  }
+
+  free(pair_table);
+  free(parent_open);
+  return 1;
+}
+
+static int pair_crosses_existing(const int *pair_table, int len, int i, int j) {
+  int a, b, k;
+
+  if (i > j) {
+    int tmp = i;
+    i = j;
+    j = tmp;
+  }
+
+  for (k = 0; k < len; k++) {
+    if (pair_table[k] > k) {
+      a = k;
+      b = pair_table[k];
+      if ((a == i) || (a == j) || (b == i) || (b == j))
+        continue;
+      if (((a < i) && (i < b) && (b < j)) ||
+          ((i < a) && (a < j) && (j < b)))
+        return 1;
+    }
+  }
+
+  return 0;
+}
+
+static int position_in_exit_channel(int idx0) {
+  return kinfold_bubble_enabled() &&
+         (GSV.channel_length > 0) &&
+         (idx0 >= GSV.channel_left) &&
+         (idx0 < GSV.channel_left + GSV.channel_length);
+}
+
+static int exit_channel_left_state(void) {
+  return (GSV.channel_length > 0) ? GSV.channel_left : -1;
+}
+
+static int exit_channel_right_state(void) {
+  return (GSV.channel_length > 0) ? (GSV.channel_left + GSV.channel_length - 1) : -1;
+}
+
+static double terminal_component_energy_for_structure(const char *structure) {
+  int *pair_table, *parent_open;
+  int len, channel_left, channel_right;
+  int left = -1, right = -1, i;
+  char *subseq, *substruc;
+  double energy = 0.0;
+
+  if (!structure)
+    return 0.0;
+
+  update_exit_channel_state();
+  len = GSV.len;
+  channel_left = exit_channel_left_state();
+  channel_right = exit_channel_right_state();
+  if ((len <= 0) || (channel_left < 0) || (channel_right < channel_left))
+    return 0.0;
+
+  pair_table = (int *)calloc((size_t)len, sizeof(int));
+  parent_open = (int *)calloc((size_t)len, sizeof(int));
+  assert(pair_table != NULL);
+  assert(parent_open != NULL);
+
+  if (!build_pair_table(structure, len, pair_table, parent_open)) {
+    free(pair_table);
+    free(parent_open);
+    return 0.0;
+  }
+
+  for (i = 0; i < len; i++) {
+    if ((pair_table[i] > i) &&
+        (parent_open[i] == -1) &&
+        (i <= channel_right) &&
+        (pair_table[i] >= channel_left) &&
+        (pair_table[i] > right)) {
+      left = i;
+      right = pair_table[i];
+    }
+  }
+
+  if ((left >= 0) && (right >= left)) {
+    subseq = (char *)calloc((size_t)(right - left + 2), sizeof(char));
+    substruc = (char *)calloc((size_t)(right - left + 2), sizeof(char));
+    assert(subseq != NULL);
+    assert(substruc != NULL);
+    memcpy(subseq, GAV.farbe + left, (size_t)(right - left + 1));
+    memcpy(substruc, structure + left, (size_t)(right - left + 1));
+    energy = (double)eval_substructure_dcal(subseq, substruc) / 100.0;
+    free(subseq);
+    free(substruc);
+  }
+
+  free(pair_table);
+  free(parent_open);
+  return energy;
+}
+
+static int rewound_dna_duplex_energy_dcal(int released_hybrid_nts) {
+  int rewound_len = 0;
+
+  if (!kinfold_bubble_enabled() || (released_hybrid_nts < 0) || (GSV.bubble_width <= 0))
+    return 0;
+
+  if ((GSV.hybrid_len > 0) &&
+      (GSV.hybrid_left >= GSV.bubble_left) &&
+      (GSV.hybrid_left <= GSV.bubble_left + GSV.bubble_width))
+    rewound_len = GSV.hybrid_left - GSV.bubble_left;
+
+  rewound_len += released_hybrid_nts;
+  if (rewound_len <= 1)
+    return 0;
+  if (rewound_len > GSV.bubble_width)
+    rewound_len = GSV.bubble_width;
+
+  return dna_duplex_segment_energy_dcal(GSV.bubble_left, rewound_len);
+}
+
+static double evaluate_rloop_terminal_plus_energy(int pair_count, int *found_out) {
+  int *pair_table, *parent_open, *temp_pairs;
+  char *candidate;
+  int len, channel_left, channel_right;
+  int i, j, target0, target1;
+  int found = 0;
+  double best = 0.0;
+
+  if (found_out)
+    *found_out = 0;
+
+  if (!kinfold_bubble_enabled() || (pair_count <= 0) || (GSV.hybrid_len < pair_count))
+    return 0.0;
+
+  update_exit_channel_state();
+  len = GSV.len;
+  channel_left = exit_channel_left_state();
+  channel_right = exit_channel_right_state();
+  if ((len <= 0) || (channel_left < 0) || (channel_right < channel_left))
+    return 0.0;
+
+  target0 = GSV.hybrid_left;
+  target1 = GSV.hybrid_left + 1;
+  if ((target0 < 0) || (target0 >= len))
+    return 0.0;
+  if ((pair_count >= 2) && ((target1 < 0) || (target1 >= len)))
+    return 0.0;
+  if (GAV.currform[target0] != '.')
+    return 0.0;
+  if ((pair_count >= 2) && (GAV.currform[target1] != '.'))
+    return 0.0;
+
+  pair_table = (int *)calloc((size_t)len, sizeof(int));
+  parent_open = (int *)calloc((size_t)len, sizeof(int));
+  assert(pair_table != NULL);
+  assert(parent_open != NULL);
+  if (!build_pair_table(GAV.currform, len, pair_table, parent_open)) {
+    free(pair_table);
+    free(parent_open);
+    return 0.0;
+  }
+  free(parent_open);
+
+  candidate = strdup(GAV.currform);
+  temp_pairs = (int *)calloc((size_t)len, sizeof(int));
+  assert(candidate != NULL);
+  assert(temp_pairs != NULL);
+
+  for (i = channel_left; i <= channel_right; i++) {
+    if (pair_table[i] >= 0)
+      continue;
+    if (!kinfold_can_pair_positions_raw(i, target0))
+      continue;
+    if (pair_crosses_existing(pair_table, len, i, target0))
+      continue;
+
+    memcpy(temp_pairs, pair_table, sizeof(int) * (size_t)len);
+    temp_pairs[i] = target0;
+    temp_pairs[target0] = i;
+    if (i < target0) {
+      candidate[i] = '(';
+      candidate[target0] = ')';
+    } else {
+      candidate[target0] = '(';
+      candidate[i] = ')';
+    }
+
+    if (pair_count == 1) {
+      double energy = terminal_component_energy_for_structure(candidate);
+      if (!found || (energy < best)) {
+        best = energy;
+        found = 1;
+      }
+    } else {
+      for (j = channel_left; j <= channel_right; j++) {
+        double energy;
+
+        if ((j == i) || (pair_table[j] >= 0))
+          continue;
+        if (!kinfold_can_pair_positions_raw(j, target1))
+          continue;
+        if (pair_crosses_existing(temp_pairs, len, j, target1))
+          continue;
+
+        temp_pairs[j] = target1;
+        temp_pairs[target1] = j;
+        if (j < target1) {
+          candidate[j] = '(';
+          candidate[target1] = ')';
+        } else {
+          candidate[target1] = '(';
+          candidate[j] = ')';
+        }
+
+        energy = terminal_component_energy_for_structure(candidate);
+        if (!found || (energy < best)) {
+          best = energy;
+          found = 1;
+        }
+
+        temp_pairs[j] = -1;
+        temp_pairs[target1] = -1;
+        candidate[j] = '.';
+        candidate[target1] = '.';
+      }
+    }
+
+    temp_pairs[i] = -1;
+    temp_pairs[target0] = -1;
+    candidate[i] = '.';
+    candidate[target0] = '.';
+  }
+
+  free(candidate);
+  free(temp_pairs);
+  free(pair_table);
+  if (found_out)
+    *found_out = found;
+  return found ? best : 0.0;
+}
+
+static double pause_rate_scale_for_state(void) {
+  static const int offsets[16] = {-12, -11, -10, -9, -8, -7, -6, -5,
+                                  -4, -3, -2, -1, 1, 2, 3, 4};
+  static const char consensus[16] = {'G','G','c','a','t','a','a','t',
+                                     'T','G','?','G','G','C','c','g'};
+  double scale = 1.0;
+  int site_idx, i, idx;
+  char dna_nt;
+  char expect;
+
+  if (!kinfold_transcription_enabled() || (GSV.transcription_elongation_rate_nt_per_s <= 0.0))
+    return 0.0;
+
+  site_idx = GSV.tx_len - 1;
+  if (site_idx < 0)
+    return 1.0;
+
+  for (i = 0; i < 16; i++) {
+    idx = site_idx + offsets[i];
+    if ((idx < 0) || (idx >= GSV.full_len))
+      continue;
+
+    dna_nt = coding_dna_nt(idx);
+    expect = consensus[i];
+
+    if (expect == '?') {
+      if ((dna_nt == 'C') || (dna_nt == 'T'))
+        scale -= 0.075;
+      continue;
+    }
+
+    if (toupper((unsigned char)expect) == dna_nt) {
+      if (isupper((unsigned char)expect))
+        scale -= 0.075;
+      else
+        scale -= 0.0375;
+    }
+  }
+
+  if (scale < 0.1)
+    scale = 0.1;
+
+  return scale;
+}
+
+static int evaluate_invasion_energy(int invade_count) {
+  int *pair_table, *parent_open;
+  int hybrid_end, idx0, idx1, best = 0, found = 0;
+  char *candidate;
+  int i, j;
+
+  if (!kinfold_bubble_enabled() || (invade_count <= 0) || (GSV.hybrid_len <= 0))
+    return 0;
+
+  hybrid_end = GSV.hybrid_left + GSV.hybrid_len - 1;
+  if (hybrid_end < 0 || hybrid_end >= GSV.len)
+    return 0;
+
+  pair_table = (int *)calloc((size_t)GSV.len, sizeof(int));
+  parent_open = (int *)calloc((size_t)GSV.len, sizeof(int));
+  assert(pair_table != NULL);
+  assert(parent_open != NULL);
+  if (!build_pair_table(GAV.currform, GSV.len, pair_table, parent_open)) {
+    free(pair_table);
+    free(parent_open);
+    return 0;
+  }
+
+  candidate = strdup(GAV.currform);
+  assert(candidate != NULL);
+
+  idx0 = hybrid_end;
+  for (i = 0; i < GSV.hybrid_left; i++) {
+    int candidate_found = 0;
+    int eval_dcal;
+
+    if (!kinfold_is_unpaired_position(i))
+      continue;
+    if (!kinfold_can_pair_positions_raw(i, idx0))
+      continue;
+    if (pair_crosses_existing(pair_table, GSV.len, i, idx0))
+      continue;
+
+    if (i < idx0) {
+      candidate[i] = '(';
+      candidate[idx0] = ')';
+    } else {
+      candidate[idx0] = '(';
+      candidate[i] = ')';
+    }
+
+    if (invade_count >= 2 && (GSV.hybrid_len >= 2)) {
+      idx1 = hybrid_end - 1;
+      for (j = 0; j < GSV.hybrid_left; j++) {
+        if (j == i)
+          continue;
+        if (!(i < j && j < idx1))
+          continue;
+        if (!kinfold_is_unpaired_position(j))
+          continue;
+        if (!kinfold_can_pair_positions_raw(j, idx1))
+          continue;
+        if (pair_crosses_existing(pair_table, GSV.len, j, idx1))
+          continue;
+
+        if (j < idx1) {
+          candidate[j] = '(';
+          candidate[idx1] = ')';
+        } else {
+          candidate[idx1] = '(';
+          candidate[j] = ')';
+        }
+        eval_dcal = kinfold_eval_structure_dcal(candidate);
+        candidate_found = 1;
+        found = 1;
+        if (!best || (eval_dcal < best))
+          best = eval_dcal;
+        candidate[j] = '.';
+        candidate[idx1] = '.';
+      }
+    }
+
+    if (invade_count == 1) {
+      eval_dcal = kinfold_eval_structure_dcal(candidate);
+      candidate_found = 1;
+      found = 1;
+      if (!best || (eval_dcal < best))
+        best = eval_dcal;
+    } else if (invade_count >= 2) {
+      /* also allow only one of the two nts to invade if that is the minimum */
+      eval_dcal = kinfold_eval_structure_dcal(candidate);
+      candidate_found = 1;
+      found = 1;
+      if (!best || (eval_dcal < best))
+        best = eval_dcal;
+    }
+
+    (void)candidate_found;
+    candidate[i] = '.';
+    candidate[idx0] = '.';
+  }
+
+  free(candidate);
+  free(pair_table);
+  free(parent_open);
+
+  return found ? best : 0;
+}
+
 static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *metrics) {
   int *pair_table, *parent_open;
   int len, bubble_left, left, right, i;
-  double current_hybrid_energy, minus1_hybrid_energy;
+  int channel_left, channel_right;
+  double current_hybrid_energy, minus1_hybrid_energy, minus2_hybrid_energy;
+  double current_rewound_dna_energy, plus1_rewound_dna_energy, plus2_rewound_dna_energy;
+  double terminal_plus1_energy, terminal_plus2_energy;
+  int terminal_plus1_found, terminal_plus2_found;
   char *subseq, *substruc, *plus1_structure, *plus1_seq, *plus1_struc;
+  int supported_shift;
+  int shifted_dcal;
 
   if (!metrics)
     return 0;
@@ -1177,17 +1833,38 @@ static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *met
   if (!kinfold_bubble_enabled())
     return 0;
 
+  update_exit_channel_state();
+  metrics->elongation_rate_current = kinfold_current_elongation_rate();
   current_hybrid_energy = kinfold_current_hybrid_energy();
   minus1_hybrid_energy = 0.0;
+  minus2_hybrid_energy = 0.0;
   if (GSV.hybrid_len > 1)
     minus1_hybrid_energy =
       (double)hybrid_segment_energy_dcal(GSV.hybrid_left + 1, GSV.hybrid_len - 1) / 100.0;
+  if (GSV.hybrid_len > 2)
+    minus2_hybrid_energy =
+      (double)hybrid_segment_energy_dcal(GSV.hybrid_left + 2, GSV.hybrid_len - 2) / 100.0;
   metrics->rna_dna_minus1_ddg = (GSV.hybrid_len > 0) ?
                                 (minus1_hybrid_energy - current_hybrid_energy) :
                                 0.0;
+  shifted_dcal = hybrid_shifted_upstream_energy_dcal(GSV.hybrid_left, GSV.hybrid_len, &supported_shift);
+  metrics->rna_dna_1nt_shift_energy = supported_shift ? ((double)shifted_dcal / 100.0) : 0.0;
+  metrics->invasion_1nt_energy = (double)evaluate_invasion_energy(1) / 100.0;
+  metrics->invasion_2nt_energy = (double)evaluate_invasion_energy(2) / 100.0;
+  current_rewound_dna_energy = (double)rewound_dna_duplex_energy_dcal(0) / 100.0;
+  plus1_rewound_dna_energy = (GSV.hybrid_len >= 1) ?
+                             ((double)rewound_dna_duplex_energy_dcal(1) / 100.0) :
+                             0.0;
+  plus2_rewound_dna_energy = (GSV.hybrid_len >= 2) ?
+                             ((double)rewound_dna_duplex_energy_dcal(2) / 100.0) :
+                             0.0;
+  terminal_plus1_energy = evaluate_rloop_terminal_plus_energy(1, &terminal_plus1_found);
+  terminal_plus2_energy = evaluate_rloop_terminal_plus_energy(2, &terminal_plus2_found);
 
   len = GSV.len;
   bubble_left = GSV.bubble_left;
+  channel_left = exit_channel_left_state();
+  channel_right = exit_channel_right_state();
   if ((len <= 0) || (bubble_left <= 0))
     return 0;
 
@@ -1200,6 +1877,15 @@ static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *met
     free(pair_table);
     free(parent_open);
     return 0;
+  }
+
+  if (channel_left >= 0) {
+    for (i = 0; i < len; i++) {
+      if (pair_table[i] > i) {
+        if (position_in_exit_channel(i) || position_in_exit_channel(pair_table[i]))
+          metrics->exit_channel_bp_count++;
+      }
+    }
   }
 
   left = -1;
@@ -1215,9 +1901,7 @@ static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *met
   }
 
   if ((left < 0) || (right < left)) {
-    free(pair_table);
-    free(parent_open);
-    return 0;
+    goto exit_channel_metrics;
   }
 
   subseq = (char *)calloc((size_t)(right - left + 2), sizeof(char));
@@ -1261,6 +1945,67 @@ static int compute_terminal_hairpin_metrics_raw(KinfoldInformationalMetrics *met
     free(plus1_seq);
     free(plus1_struc);
     free(plus1_structure);
+  }
+
+exit_channel_metrics:
+  left = -1;
+  right = -1;
+  if (channel_left >= 0) {
+    for (i = 0; i < len; i++) {
+      if ((pair_table[i] > i) &&
+          (parent_open[i] == -1) &&
+          (i <= channel_right) &&
+          (pair_table[i] >= channel_left) &&
+          (pair_table[i] > right)) {
+        left = i;
+        right = pair_table[i];
+      }
+    }
+  }
+
+  if ((left >= 0) && (right >= left)) {
+    subseq = (char *)calloc((size_t)(right - left + 2), sizeof(char));
+    substruc = (char *)calloc((size_t)(right - left + 2), sizeof(char));
+    assert(subseq != NULL);
+    assert(substruc != NULL);
+    memcpy(subseq, GAV.farbe + left, (size_t)(right - left + 1));
+    memcpy(substruc, GAV.currform + left, (size_t)(right - left + 1));
+    metrics->terminal_energy = (double)eval_substructure_dcal(subseq, substruc) / 100.0;
+    free(subseq);
+    free(substruc);
+  }
+
+  if ((channel_left >= 0) && (channel_right >= channel_left) &&
+      build_substructure_with_outside_pairs_dotted(GAV.farbe,
+                                                   GAV.currform,
+                                                   channel_left,
+                                                   channel_right,
+                                                   &subseq,
+                                                   &substruc)) {
+    metrics->folding_inside_channel_energy =
+      (double)eval_substructure_dcal(subseq, substruc) / 100.0;
+    free(subseq);
+    free(substruc);
+  }
+
+  if (GSV.hybrid_len >= 1 && terminal_plus1_found) {
+    metrics->rloop_1nt_energy =
+      terminal_plus1_energy +
+      minus1_hybrid_energy +
+      plus1_rewound_dna_energy -
+      metrics->terminal_energy -
+      current_hybrid_energy -
+      current_rewound_dna_energy;
+  }
+
+  if (GSV.hybrid_len >= 2 && terminal_plus2_found) {
+    metrics->rloop_2nt_energy =
+      terminal_plus2_energy +
+      minus2_hybrid_energy +
+      plus2_rewound_dna_energy -
+      metrics->terminal_energy -
+      current_hybrid_energy -
+      current_rewound_dna_energy;
   }
 
   free(pair_table);

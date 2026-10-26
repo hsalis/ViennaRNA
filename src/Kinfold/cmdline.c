@@ -59,11 +59,14 @@ const char *gengetopt_args_info_full_help[] = {
   "      --transcription_elongation_rate=DOUBLE\n                                set transcription elongation rate in\n                                  nucleotides per second  (default=`0')",
   "      --kinfold_seconds_per_time_unit=DOUBLE\n                                set physical seconds represented by one Kinfold\n                                  time unit  (default=`1e-5')",
   "      --max_bubble_width=INT    set maximum transcription bubble width in\n                                  nucleotides  (default=`0')",
+  "      --RNAP_exit_channel_length=INT\n                                set RNAP RNA exit-channel length in nucleotides\n                                  (default=`20')",
   "      --dump_transcription_neighbors\n                                debug: dump transcription/bubble neighbor sets\n                                  to stderr  (default=off)",
   "      --phi=DOUBLE              set phi value",
   "      --pbounds=STRING          specify 3 floats for phi_min, phi_inc, phi_max\n                                  in the form <d1=d2=d3>",
   "\nOutput:",
   "      --log=filename            set basename of log-file  (default=`kinout')",
+  "      --csv-output=filename     write sampled trajectory states and metrics to\n                                  CSV file",
+  "      --structure-time-only     print sequence once, then only RNA structure\n                                  and time to stdout  (default=off)",
   "  -q, --silent                  no output to stdout  (default=off)",
   "  -v, --verbose                 more information to stdout  (default=off)",
   "      --lmin                    output only local minima to stdout\n                                  (default=off)",
@@ -100,18 +103,21 @@ init_help_array(void)
   gengetopt_args_info_help[22] = gengetopt_args_info_full_help[23];
   gengetopt_args_info_help[23] = gengetopt_args_info_full_help[24];
   gengetopt_args_info_help[24] = gengetopt_args_info_full_help[25];
-  gengetopt_args_info_help[25] = gengetopt_args_info_full_help[29];
+  gengetopt_args_info_help[25] = gengetopt_args_info_full_help[26];
   gengetopt_args_info_help[26] = gengetopt_args_info_full_help[30];
   gengetopt_args_info_help[27] = gengetopt_args_info_full_help[31];
   gengetopt_args_info_help[28] = gengetopt_args_info_full_help[32];
   gengetopt_args_info_help[29] = gengetopt_args_info_full_help[33];
   gengetopt_args_info_help[30] = gengetopt_args_info_full_help[34];
   gengetopt_args_info_help[31] = gengetopt_args_info_full_help[35];
-  gengetopt_args_info_help[32] = 0; 
-  
+  gengetopt_args_info_help[32] = gengetopt_args_info_full_help[36];
+  gengetopt_args_info_help[33] = gengetopt_args_info_full_help[37];
+  gengetopt_args_info_help[34] = gengetopt_args_info_full_help[38];
+  gengetopt_args_info_help[35] = 0;
+
 }
 
-const char *gengetopt_args_info_help[33];
+const char *gengetopt_args_info_help[36];
 
 typedef enum {ARG_NO
   , ARG_FLAG
@@ -162,10 +168,13 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->transcription_elongation_rate_given = 0 ;
   args_info->kinfold_seconds_per_time_unit_given = 0 ;
   args_info->max_bubble_width_given = 0 ;
+  args_info->RNAP_exit_channel_length_given = 0 ;
   args_info->dump_transcription_neighbors_given = 0 ;
   args_info->phi_given = 0 ;
   args_info->pbounds_given = 0 ;
   args_info->log_given = 0 ;
+  args_info->csv_output_given = 0 ;
+  args_info->structure_time_only_given = 0 ;
   args_info->silent_given = 0 ;
   args_info->verbose_given = 0 ;
   args_info->lmin_given = 0 ;
@@ -208,25 +217,30 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->kinfold_seconds_per_time_unit_orig = NULL;
   args_info->max_bubble_width_arg = 0;
   args_info->max_bubble_width_orig = NULL;
+  args_info->RNAP_exit_channel_length_arg = 20;
+  args_info->RNAP_exit_channel_length_orig = NULL;
   args_info->dump_transcription_neighbors_flag = 0;
   args_info->phi_orig = NULL;
   args_info->pbounds_arg = NULL;
   args_info->pbounds_orig = NULL;
   args_info->log_arg = gengetopt_strdup ("kinout");
   args_info->log_orig = NULL;
+  args_info->csv_output_arg = NULL;
+  args_info->csv_output_orig = NULL;
+  args_info->structure_time_only_flag = 0;
   args_info->silent_flag = 0;
   args_info->verbose_flag = 0;
   args_info->lmin_flag = 0;
   args_info->cut_arg = 0;
   args_info->cut_orig = NULL;
-  
+
 }
 
 static
 void init_args_info(struct gengetopt_args_info *args_info)
 {
 
-  init_help_array(); 
+  init_help_array();
   args_info->help_help = gengetopt_args_info_full_help[0] ;
   args_info->full_help_help = gengetopt_args_info_full_help[1] ;
   args_info->version_help = gengetopt_args_info_full_help[2] ;
@@ -250,15 +264,18 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->transcription_elongation_rate_help = gengetopt_args_info_full_help[23] ;
   args_info->kinfold_seconds_per_time_unit_help = gengetopt_args_info_full_help[24] ;
   args_info->max_bubble_width_help = gengetopt_args_info_full_help[25] ;
-  args_info->dump_transcription_neighbors_help = gengetopt_args_info_full_help[26] ;
-  args_info->phi_help = gengetopt_args_info_full_help[27] ;
-  args_info->pbounds_help = gengetopt_args_info_full_help[28] ;
-  args_info->log_help = gengetopt_args_info_full_help[30] ;
-  args_info->silent_help = gengetopt_args_info_full_help[31] ;
-  args_info->verbose_help = gengetopt_args_info_full_help[32] ;
-  args_info->lmin_help = gengetopt_args_info_full_help[33] ;
-  args_info->cut_help = gengetopt_args_info_full_help[34] ;
-  
+  args_info->RNAP_exit_channel_length_help = gengetopt_args_info_full_help[26] ;
+  args_info->dump_transcription_neighbors_help = gengetopt_args_info_full_help[27] ;
+  args_info->phi_help = gengetopt_args_info_full_help[28] ;
+  args_info->pbounds_help = gengetopt_args_info_full_help[29] ;
+  args_info->log_help = gengetopt_args_info_full_help[31] ;
+  args_info->csv_output_help = gengetopt_args_info_full_help[32] ;
+  args_info->structure_time_only_help = gengetopt_args_info_full_help[33] ;
+  args_info->silent_help = gengetopt_args_info_full_help[34] ;
+  args_info->verbose_help = gengetopt_args_info_full_help[35] ;
+  args_info->lmin_help = gengetopt_args_info_full_help[36] ;
+  args_info->cut_help = gengetopt_args_info_full_help[37] ;
+
 }
 
 void
@@ -323,7 +340,7 @@ void
 cmdline_parser_params_init(struct cmdline_parser_params *params)
 {
   if (params)
-    { 
+    {
       params->override = 0;
       params->initialize = 1;
       params->check_required = 1;
@@ -335,9 +352,9 @@ cmdline_parser_params_init(struct cmdline_parser_params *params)
 struct cmdline_parser_params *
 cmdline_parser_params_create(void)
 {
-  struct cmdline_parser_params *params = 
+  struct cmdline_parser_params *params =
     (struct cmdline_parser_params *)malloc(sizeof(struct cmdline_parser_params));
-  cmdline_parser_params_init(params);  
+  cmdline_parser_params_init(params);
   return params;
 }
 
@@ -370,14 +387,17 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->transcription_elongation_rate_orig));
   free_string_field (&(args_info->kinfold_seconds_per_time_unit_orig));
   free_string_field (&(args_info->max_bubble_width_orig));
+  free_string_field (&(args_info->RNAP_exit_channel_length_orig));
   free_string_field (&(args_info->phi_orig));
   free_string_field (&(args_info->pbounds_arg));
   free_string_field (&(args_info->pbounds_orig));
   free_string_field (&(args_info->log_arg));
   free_string_field (&(args_info->log_orig));
+  free_string_field (&(args_info->csv_output_arg));
+  free_string_field (&(args_info->csv_output_orig));
   free_string_field (&(args_info->cut_orig));
-  
-  
+
+
 
   clear_given (args_info);
 }
@@ -424,7 +444,7 @@ write_into_file(FILE *outfile, const char *opt, const char *arg, const char *val
   int found = -1;
   if (arg) {
     if (values) {
-      found = check_possible_values(arg, values);      
+      found = check_possible_values(arg, values);
     }
     if (found >= 0)
       fprintf(outfile, "%s=\"%s\" # %s\n", opt, arg, values[found]);
@@ -493,6 +513,8 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "kinfold_seconds_per_time_unit", args_info->kinfold_seconds_per_time_unit_orig, 0);
   if (args_info->max_bubble_width_given)
     write_into_file(outfile, "max_bubble_width", args_info->max_bubble_width_orig, 0);
+  if (args_info->RNAP_exit_channel_length_given)
+    write_into_file(outfile, "RNAP_exit_channel_length", args_info->RNAP_exit_channel_length_orig, 0);
   if (args_info->dump_transcription_neighbors_given)
     write_into_file(outfile, "dump_transcription_neighbors", 0, 0 );
   if (args_info->phi_given)
@@ -501,6 +523,10 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "pbounds", args_info->pbounds_orig, 0);
   if (args_info->log_given)
     write_into_file(outfile, "log", args_info->log_orig, 0);
+  if (args_info->csv_output_given)
+    write_into_file(outfile, "csv-output", args_info->csv_output_orig, 0);
+  if (args_info->structure_time_only_given)
+    write_into_file(outfile, "structure-time-only", 0, 0 );
   if (args_info->silent_given)
     write_into_file(outfile, "silent", 0, 0 );
   if (args_info->verbose_given)
@@ -509,7 +535,7 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "lmin", 0, 0 );
   if (args_info->cut_given)
     write_into_file(outfile, "cut", args_info->cut_orig, 0);
-  
+
 
   i = EXIT_SUCCESS;
   return i;
@@ -574,7 +600,7 @@ cmdline_parser_ext (int argc, char **argv, struct gengetopt_args_info *args_info
       cmdline_parser_free (args_info);
       exit (EXIT_FAILURE);
     }
-  
+
   return result;
 }
 
@@ -583,7 +609,7 @@ cmdline_parser2 (int argc, char **argv, struct gengetopt_args_info *args_info, i
 {
   int result;
   struct cmdline_parser_params params;
-  
+
   params.override = override;
   params.initialize = initialize;
   params.check_required = check_required;
@@ -597,7 +623,7 @@ cmdline_parser2 (int argc, char **argv, struct gengetopt_args_info *args_info, i
       cmdline_parser_free (args_info);
       exit (EXIT_FAILURE);
     }
-  
+
   return result;
 }
 
@@ -622,7 +648,7 @@ cmdline_parser_required (struct gengetopt_args_info *args_info, const char *prog
  *
  */
 
-/* 
+/*
  * we must include anything we need since this file is not thought to be
  * inserted in a file already using getopt.h
  *
@@ -1157,7 +1183,7 @@ static int getopt_internal_r(int argc, char *const *argv, const char *optstring,
 		return -1;
 	d->custom_optarg = NULL;
 
-	/* 
+	/*
 	 * This is a big difference with GNU getopt, since optind == 0
 	 * means initialization while here 1 means first call.
 	 */
@@ -1224,7 +1250,7 @@ static char *package_name = 0;
  */
 static
 int update_arg(void *field, char **orig_field,
-               unsigned int *field_given, unsigned int *prev_given, 
+               unsigned int *field_given, unsigned int *prev_given,
                char *value, const char *possible_values[],
                const char *default_value,
                cmdline_parser_arg_type arg_type,
@@ -1245,11 +1271,11 @@ int update_arg(void *field, char **orig_field,
   if (!multiple_option && prev_given && (*prev_given || (check_ambiguity && *field_given)))
     {
       if (short_opt != '-')
-        fprintf (stderr, "%s: `--%s' (`-%c') option given more than once%s\n", 
+        fprintf (stderr, "%s: `--%s' (`-%c') option given more than once%s\n",
                package_name, long_opt, short_opt,
                (additional_error ? additional_error : ""));
       else
-        fprintf (stderr, "%s: `--%s' option given more than once%s\n", 
+        fprintf (stderr, "%s: `--%s' option given more than once%s\n",
                package_name, long_opt,
                (additional_error ? additional_error : ""));
       return 1; /* failure */
@@ -1258,16 +1284,16 @@ int update_arg(void *field, char **orig_field,
   if (possible_values && (found = check_possible_values((value ? value : default_value), possible_values)) < 0)
     {
       if (short_opt != '-')
-        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s' (`-%c')%s\n", 
+        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s' (`-%c')%s\n",
           package_name, (found == -2) ? "ambiguous" : "invalid", value, long_opt, short_opt,
           (additional_error ? additional_error : ""));
       else
-        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s'%s\n", 
+        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s'%s\n",
           package_name, (found == -2) ? "ambiguous" : "invalid", value, long_opt,
           (additional_error ? additional_error : ""));
       return 1; /* failure */
     }
-    
+
   if (field_given && *field_given && ! override)
     return 0;
   if (prev_given)
@@ -1346,7 +1372,7 @@ cmdline_parser_internal (
 
   int error_occurred = 0;
   struct gengetopt_args_info local_args_info;
-  
+
   int override;
   int initialize;
   int check_required;
@@ -1356,9 +1382,9 @@ cmdline_parser_internal (
   int optind;
   int opterr;
   int optopt;
-  
+
   package_name = argv[0];
-  
+
   /* TODO: Why is this here? It is not used anywhere. */
   override = params->override;
   FIX_UNUSED(override);
@@ -1408,10 +1434,13 @@ cmdline_parser_internal (
         { "transcription_elongation_rate",	1, NULL, 0 },
         { "kinfold_seconds_per_time_unit",	1, NULL, 0 },
         { "max_bubble_width",	1, NULL, 0 },
+        { "RNAP_exit_channel_length",	1, NULL, 0 },
         { "dump_transcription_neighbors",	0, NULL, 0 },
         { "phi",	1, NULL, 0 },
         { "pbounds",	1, NULL, 0 },
         { "log",	1, NULL, 0 },
+        { "csv-output",	1, NULL, 0 },
+        { "structure-time-only",	0, NULL, 0 },
         { "silent",	0, NULL, 'q' },
         { "verbose",	0, NULL, 'v' },
         { "lmin",	0, NULL, 0 },
@@ -1446,60 +1475,60 @@ cmdline_parser_internal (
           exit (EXIT_SUCCESS);
 
         case 'd':	/* <0|1|2> set dangling end model to (none|normal|double).  */
-        
-        
-          if (update_arg( (void *)&(args_info->dangle_arg), 
+
+
+          if (update_arg( (void *)&(args_info->dangle_arg),
                &(args_info->dangle_orig), &(args_info->dangle_given),
               &(local_args_info.dangle_given), optarg, cmdline_parser_dangle_values, "2", ARG_INT,
               check_ambiguity, override, 0, 0,
               "dangle", 'd',
               additional_error))
             goto failure;
-        
+
           break;
         case 'T':	/* simulation temperature.  */
-        
-        
-          if (update_arg( (void *)&(args_info->Temp_arg), 
+
+
+          if (update_arg( (void *)&(args_info->Temp_arg),
                &(args_info->Temp_orig), &(args_info->Temp_given),
               &(local_args_info.Temp_given), optarg, 0, "37", ARG_FLOAT,
               check_ambiguity, override, 0, 0,
               "Temp", 'T',
               additional_error))
             goto failure;
-        
+
           break;
         case 'P':	/* read energy-parameter-file.  */
-        
-        
-          if (update_arg( (void *)&(args_info->Par_arg), 
+
+
+          if (update_arg( (void *)&(args_info->Par_arg),
                &(args_info->Par_orig), &(args_info->Par_given),
               &(local_args_info.Par_given), optarg, 0, 0, ARG_STRING,
               check_ambiguity, override, 0, 0,
               "Par", 'P',
               additional_error))
             goto failure;
-        
+
           break;
         case 'q':	/* no output to stdout.  */
-        
-        
+
+
           if (update_arg((void *)&(args_info->silent_flag), 0, &(args_info->silent_given),
               &(local_args_info.silent_given), optarg, 0, 0, ARG_FLAG,
               check_ambiguity, override, 1, 0, "silent", 'q',
               additional_error))
             goto failure;
-        
+
           break;
         case 'v':	/* more information to stdout.  */
-        
-        
+
+
           if (update_arg((void *)&(args_info->verbose_flag), 0, &(args_info->verbose_given),
               &(local_args_info.verbose_given), optarg, 0, 0, ARG_FLAG,
               check_ambiguity, override, 1, 0, "verbose", 'v',
               additional_error))
             goto failure;
-        
+
           break;
 
         case 0:	/* Long option with no short option */
@@ -1512,306 +1541,346 @@ cmdline_parser_internal (
           /* use logarithmic multiloop energies instead of linear.  */
           if (strcmp (long_options[option_index].name, "logML") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->logML_flag), 0, &(args_info->logML_given),
                 &(local_args_info.logML_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "logML", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* turn off shift-moves.  */
           else if (strcmp (long_options[option_index].name, "noShift") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->noShift_flag), 0, &(args_info->noShift_given),
                 &(local_args_info.noShift_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "noShift", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* forbid structures with isolated base-pairs.  */
           else if (strcmp (long_options[option_index].name, "noLP") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->noLP_flag), 0, &(args_info->noLP_given),
                 &(local_args_info.noLP_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "noLP", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set random number seed specify 3 integers as int=int=int.  */
           else if (strcmp (long_options[option_index].name, "seed") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->seed_arg), 
+
+
+            if (update_arg( (void *)&(args_info->seed_arg),
                  &(args_info->seed_orig), &(args_info->seed_given),
                 &(local_args_info.seed_given), optarg, 0, "clock", ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "seed", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set maxtime of simulation.  */
           else if (strcmp (long_options[option_index].name, "time") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->time_arg), 
+
+
+            if (update_arg( (void *)&(args_info->time_arg),
                  &(args_info->time_orig), &(args_info->time_given),
                 &(local_args_info.time_given), optarg, 0, "500", ARG_FLOAT,
                 check_ambiguity, override, 0, 0,
                 "time", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* save/output trajectory state every <float> seconds.  */
           else if (strcmp (long_options[option_index].name, "time-step") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->time_step_arg), 
+
+
+            if (update_arg( (void *)&(args_info->time_step_arg),
                  &(args_info->time_step_orig), &(args_info->time_step_given),
                 &(local_args_info.time_step_given), optarg, 0, "1.0", ARG_DOUBLE,
                 check_ambiguity, override, 0, 0,
                 "time-step", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set number of trajectories.  */
           else if (strcmp (long_options[option_index].name, "num") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->num_arg), 
+
+
+            if (update_arg( (void *)&(args_info->num_arg),
                  &(args_info->num_orig), &(args_info->num_given),
                 &(local_args_info.num_given), optarg, 0, "1", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "num", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* read start structure from stdin (otherwise use open chain).  */
           else if (strcmp (long_options[option_index].name, "start") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->start_flag), 0, &(args_info->start_given),
                 &(local_args_info.start_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "start", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* read stop structure(s) from stdin (otherwise use MFE).  */
           else if (strcmp (long_options[option_index].name, "stop") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->stop_flag), 0, &(args_info->stop_given),
                 &(local_args_info.stop_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "stop", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* use Metropolis rule for rates (not Kawasaki rule).  */
           else if (strcmp (long_options[option_index].name, "met") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->met_flag), 0, &(args_info->met_given),
                 &(local_args_info.met_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "met", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* compute first passage time (stop when a stop-structure is reached).  */
           else if (strcmp (long_options[option_index].name, "fpt") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->fpt_flag), 0, &(args_info->fpt_given),
                 &(local_args_info.fpt_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "fpt", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* compute recurrence time (of a start structure which is contained in stop structures).  */
           else if (strcmp (long_options[option_index].name, "rect") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->rect_flag), 0, &(args_info->rect_given),
                 &(local_args_info.rect_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "rect", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* deprecated compatibility alias for transcription elongation.  */
           else if (strcmp (long_options[option_index].name, "grow") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->grow_arg), 
+
+
+            if (update_arg( (void *)&(args_info->grow_arg),
                  &(args_info->grow_orig), &(args_info->grow_given),
                 &(local_args_info.grow_given), optarg, 0, "0", ARG_FLOAT,
                 check_ambiguity, override, 0, 0,
                 "grow", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* initial size of growing chain.  */
           else if (strcmp (long_options[option_index].name, "glen") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->glen_arg), 
+
+
+            if (update_arg( (void *)&(args_info->glen_arg),
                  &(args_info->glen_orig), &(args_info->glen_given),
                 &(local_args_info.glen_given), optarg, 0, "15", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "glen", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set transcription elongation rate in nucleotides per second.  */
           else if (strcmp (long_options[option_index].name, "transcription_elongation_rate") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->transcription_elongation_rate_arg), 
+
+
+            if (update_arg( (void *)&(args_info->transcription_elongation_rate_arg),
                  &(args_info->transcription_elongation_rate_orig), &(args_info->transcription_elongation_rate_given),
                 &(local_args_info.transcription_elongation_rate_given), optarg, 0, "0", ARG_DOUBLE,
                 check_ambiguity, override, 0, 0,
                 "transcription_elongation_rate", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set physical seconds represented by one Kinfold time unit.  */
           else if (strcmp (long_options[option_index].name, "kinfold_seconds_per_time_unit") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->kinfold_seconds_per_time_unit_arg), 
+
+
+            if (update_arg( (void *)&(args_info->kinfold_seconds_per_time_unit_arg),
                  &(args_info->kinfold_seconds_per_time_unit_orig), &(args_info->kinfold_seconds_per_time_unit_given),
                 &(local_args_info.kinfold_seconds_per_time_unit_given), optarg, 0, "1e-5", ARG_DOUBLE,
                 check_ambiguity, override, 0, 0,
                 "kinfold_seconds_per_time_unit", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set maximum transcription bubble width in nucleotides.  */
           else if (strcmp (long_options[option_index].name, "max_bubble_width") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->max_bubble_width_arg), 
+
+
+            if (update_arg( (void *)&(args_info->max_bubble_width_arg),
                  &(args_info->max_bubble_width_orig), &(args_info->max_bubble_width_given),
                 &(local_args_info.max_bubble_width_given), optarg, 0, "0", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "max_bubble_width", '-',
                 additional_error))
               goto failure;
-          
+
+          }
+          /* set RNAP RNA exit-channel length in nucleotides.  */
+          else if (strcmp (long_options[option_index].name, "RNAP_exit_channel_length") == 0)
+          {
+
+
+            if (update_arg( (void *)&(args_info->RNAP_exit_channel_length_arg),
+                 &(args_info->RNAP_exit_channel_length_orig), &(args_info->RNAP_exit_channel_length_given),
+                &(local_args_info.RNAP_exit_channel_length_given), optarg, 0, "20", ARG_INT,
+                check_ambiguity, override, 0, 0,
+                "RNAP_exit_channel_length", '-',
+                additional_error))
+              goto failure;
+
           }
           /* debug: dump transcription/bubble neighbor sets to stderr.  */
           else if (strcmp (long_options[option_index].name, "dump_transcription_neighbors") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->dump_transcription_neighbors_flag), 0, &(args_info->dump_transcription_neighbors_given),
                 &(local_args_info.dump_transcription_neighbors_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "dump_transcription_neighbors", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set phi value.  */
           else if (strcmp (long_options[option_index].name, "phi") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->phi_arg), 
+
+
+            if (update_arg( (void *)&(args_info->phi_arg),
                  &(args_info->phi_orig), &(args_info->phi_given),
                 &(local_args_info.phi_given), optarg, 0, 0, ARG_DOUBLE,
                 check_ambiguity, override, 0, 0,
                 "phi", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* specify 3 floats for phi_min, phi_inc, phi_max in the form <d1=d2=d3>.  */
           else if (strcmp (long_options[option_index].name, "pbounds") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->pbounds_arg), 
+
+
+            if (update_arg( (void *)&(args_info->pbounds_arg),
                  &(args_info->pbounds_orig), &(args_info->pbounds_given),
                 &(local_args_info.pbounds_given), optarg, 0, 0, ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "pbounds", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* set basename of log-file.  */
           else if (strcmp (long_options[option_index].name, "log") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->log_arg), 
+
+
+            if (update_arg( (void *)&(args_info->log_arg),
                  &(args_info->log_orig), &(args_info->log_given),
                 &(local_args_info.log_given), optarg, 0, "kinout", ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "log", '-',
                 additional_error))
               goto failure;
-          
+
+          }
+          /* write sampled trajectory states and metrics to CSV file.  */
+          else if (strcmp (long_options[option_index].name, "csv-output") == 0)
+          {
+
+
+            if (update_arg( (void *)&(args_info->csv_output_arg),
+                 &(args_info->csv_output_orig), &(args_info->csv_output_given),
+                &(local_args_info.csv_output_given), optarg, 0, 0, ARG_STRING,
+                check_ambiguity, override, 0, 0,
+                "csv-output", '-',
+                additional_error))
+              goto failure;
+
+          }
+          /* print sequence once, then only RNA structure and time to stdout.  */
+          else if (strcmp (long_options[option_index].name, "structure-time-only") == 0)
+          {
+
+
+            if (update_arg((void *)&(args_info->structure_time_only_flag), 0, &(args_info->structure_time_only_given),
+                &(local_args_info.structure_time_only_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "structure-time-only", '-',
+                additional_error))
+              goto failure;
+
           }
           /* output only local minima to stdout.  */
           else if (strcmp (long_options[option_index].name, "lmin") == 0)
           {
-          
-          
+
+
             if (update_arg((void *)&(args_info->lmin_flag), 0, &(args_info->lmin_given),
                 &(local_args_info.lmin_given), optarg, 0, 0, ARG_FLAG,
                 check_ambiguity, override, 1, 0, "lmin", '-',
                 additional_error))
               goto failure;
-          
+
           }
           /* only print structures with E <= MFE + <float> to stdout (default: no cutoff).  */
           else if (strcmp (long_options[option_index].name, "cut") == 0)
           {
-          
-          
-            if (update_arg( (void *)&(args_info->cut_arg), 
+
+
+            if (update_arg( (void *)&(args_info->cut_arg),
                  &(args_info->cut_orig), &(args_info->cut_given),
                 &(local_args_info.cut_given), optarg, 0, "0", ARG_FLOAT,
                 check_ambiguity, override, 0, 0,
                 "cut", '-',
                 additional_error))
               goto failure;
-          
+
           }
-          
+
           break;
         case '?':	/* Invalid option.  */
           /* `getopt_long' already printed an error message.  */
@@ -1835,7 +1904,7 @@ cmdline_parser_internal (
   return 0;
 
 failure:
-  
+
   cmdline_parser_release (&local_args_info);
   return (EXIT_FAILURE);
 }

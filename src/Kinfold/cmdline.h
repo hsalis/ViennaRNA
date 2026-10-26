@@ -92,6 +92,9 @@ struct gengetopt_args_info
   int max_bubble_width_arg;	/**< @brief set maximum transcription bubble width in nucleotides (default='0').  */
   char * max_bubble_width_orig;	/**< @brief set maximum transcription bubble width in nucleotides original value given at command line.  */
   const char *max_bubble_width_help; /**< @brief set maximum transcription bubble width in nucleotides help description.  */
+  int RNAP_exit_channel_length_arg;	/**< @brief set RNAP RNA exit-channel length in nucleotides (default='20').  */
+  char * RNAP_exit_channel_length_orig;	/**< @brief set RNAP RNA exit-channel length in nucleotides original value given at command line.  */
+  const char *RNAP_exit_channel_length_help; /**< @brief set RNAP RNA exit-channel length in nucleotides help description.  */
   int dump_transcription_neighbors_flag;	/**< @brief debug: dump transcription/bubble neighbor sets to stderr (default=off).  */
   const char *dump_transcription_neighbors_help; /**< @brief debug: dump transcription/bubble neighbor sets to stderr help description.  */
   double phi_arg;	/**< @brief set phi value.  */
@@ -103,6 +106,11 @@ struct gengetopt_args_info
   char * log_arg;	/**< @brief set basename of log-file (default='kinout').  */
   char * log_orig;	/**< @brief set basename of log-file original value given at command line.  */
   const char *log_help; /**< @brief set basename of log-file help description.  */
+  char * csv_output_arg;	/**< @brief write sampled trajectory states and metrics to CSV file.  */
+  char * csv_output_orig;	/**< @brief write sampled trajectory states and metrics to CSV file original value given at command line.  */
+  const char *csv_output_help; /**< @brief write sampled trajectory states and metrics to CSV file help description.  */
+  int structure_time_only_flag;	/**< @brief print sequence once, then only RNA structure and time to stdout (default=off).  */
+  const char *structure_time_only_help; /**< @brief print sequence once, then only RNA structure and time to stdout help description.  */
   int silent_flag;	/**< @brief no output to stdout (default=off).  */
   const char *silent_help; /**< @brief no output to stdout help description.  */
   int verbose_flag;	/**< @brief more information to stdout (default=off).  */
@@ -136,10 +144,13 @@ struct gengetopt_args_info
   unsigned int transcription_elongation_rate_given ;	/**< @brief Whether transcription_elongation_rate was given.  */
   unsigned int kinfold_seconds_per_time_unit_given ;	/**< @brief Whether kinfold_seconds_per_time_unit was given.  */
   unsigned int max_bubble_width_given ;	/**< @brief Whether max_bubble_width was given.  */
+  unsigned int RNAP_exit_channel_length_given ;	/**< @brief Whether RNAP_exit_channel_length was given.  */
   unsigned int dump_transcription_neighbors_given ;	/**< @brief Whether dump_transcription_neighbors was given.  */
   unsigned int phi_given ;	/**< @brief Whether phi was given.  */
   unsigned int pbounds_given ;	/**< @brief Whether pbounds was given.  */
   unsigned int log_given ;	/**< @brief Whether log was given.  */
+  unsigned int csv_output_given ;	/**< @brief Whether csv-output was given.  */
+  unsigned int structure_time_only_given ;	/**< @brief Whether structure-time-only was given.  */
   unsigned int silent_given ;	/**< @brief Whether silent was given.  */
   unsigned int verbose_given ;	/**< @brief Whether verbose was given.  */
   unsigned int lmin_given ;	/**< @brief Whether lmin was given.  */

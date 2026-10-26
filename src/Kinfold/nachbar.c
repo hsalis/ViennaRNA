@@ -89,7 +89,17 @@ static double displayed_dna_duplex_energy(void);
 static int should_emit_to_stdout(void);
 static void emit_state_line(double out_time, int found_stop, int terminal);
 static void emit_sampled_states(double limit_time, int include_limit_time);
+static void print_console_legend(void);
+static void csv_write_escaped(FILE *fp, const char *text);
+static void csv_write_header(FILE *fp);
+static void emit_csv_state_line(double out_time, int found_stop, int terminal, const KinfoldInformationalMetrics *metrics);
+static void interval_metrics_reset(KinfoldIntervalMetrics *interval);
+static void interval_metrics_update(KinfoldIntervalMetrics *interval, const KinfoldInformationalMetrics *metrics);
+static void interval_seed_from_emitted_state(const KinfoldInformationalMetrics *metrics);
+static void track_hidden_state(double time_value);
+static void begin_trajectory_if_needed(void);
 static double compute_transition_rate(unsigned char kind, double curr_total, double total_E);
+static int position_in_exit_channel_current(int idx0);
 static void dump_transcription_state(FILE *fp);
 static void dump_transcription_neighbor(FILE *fp,
                                        unsigned char kind,
@@ -107,12 +117,23 @@ static int eval_extended_structure_dcal(int new_len, const char *structure);
 static void set_active_prefix_length(int new_len);
 static void apply_transcription_move(int next);
 static FILE *logFP=NULL;
+static FILE *csvFP=NULL;
+static KinfoldIntervalMetrics current_interval_metrics;
+static KinfoldIntervalMetrics last_exported_interval_metrics;
+static KinfoldMetricSmootherState csv_metric_state;
+static int csv_tracker_active = 0;
+static int csv_tracker_trajectory = -1;
+static double csv_last_emitted_time = -1.0;
+static int structure_time_header_printed = 0;
+static int console_legend_printed = 0;
 
 /**/
 void ini_nbList(int chords) {
   char logFN[256];
 
   _RT = (((temperature + K0) * GASCONST) / 1000.0);
+  structure_time_header_printed = 0;
+  console_legend_printed = 0;
   if (neighbor_list!=NULL) return;
   /*
     list for move coding
@@ -143,6 +164,18 @@ void ini_nbList(int chords) {
     log_start_stop(logFP);
   } else {
     logFP = NULL;
+  }
+
+  if (GAV.CSVOutputFile && GAV.CSVOutputFile[0] != '\0') {
+    csvFP = fopen(GAV.CSVOutputFile, "w");
+    if (csvFP == NULL) {
+      fprintf(stderr, "Failed to open CSV output file '%s'\n", GAV.CSVOutputFile);
+      exit(EXIT_FAILURE);
+    }
+    csv_write_header(csvFP);
+    fflush(csvFP);
+  } else {
+    csvFP = NULL;
   }
 }
 
@@ -224,6 +257,8 @@ int sel_nb(void) {
   double pegel = 0.0, schwelle = 0.0, zufall = 0.0;
   int found_stop=0;
 
+  begin_trajectory_if_needed();
+
   if (!is_from_cache && transcription_active())
     append_transcription_neighbors();
 
@@ -248,8 +283,8 @@ int sel_nb(void) {
   if (totalflux>0)
     zeitInc = (log(1. / zufall) / totalflux);
   else {
-    if (transcription_active() && (GSV.elongation_propensity_internal > 0.0))
-      zeitInc = 1.0 / GSV.elongation_propensity_internal;
+    if (transcription_active() && (kinfold_current_elongation_propensity() > 0.0))
+      zeitInc = 1.0 / kinfold_current_elongation_propensity();
     else if (GSV.grow>0) zeitInc=GSV.grow;
     else zeitInc = GSV.time;
   }
@@ -403,6 +438,11 @@ int sel_nb(void) {
     } else {
       apply_transcription_move(next);
     }
+    if (csv_tracker_active) {
+      if (fabs(csv_last_emitted_time - Zeit) <= 1e-9)
+        interval_metrics_reset(&current_interval_metrics);
+      track_hidden_state(Zeit);
+    }
   } else {
     clean_up_rl(); ini_or_reset_rl();
   }
@@ -440,15 +480,249 @@ static double displayed_dna_duplex_energy(void) {
   return kinfold_bubble_enabled() ? kinfold_current_dna_duplex_energy() : 0.0;
 }
 
+static int position_in_exit_channel_current(int idx0) {
+  int left = kinfold_channel_left();
+  int length = kinfold_channel_length();
+
+  return (length > 0) && (idx0 >= left) && (idx0 < left + length);
+}
+
 static int should_emit_to_stdout(void) {
   return (!GTV.silent) &&
          (!kinfold_capture_suppress_output()) &&
          (displayed_structure_energy() <= GSV.stopE + GSV.cut);
 }
 
+static void csv_write_escaped(FILE *fp, const char *text) {
+  const char *p;
+
+  fputc('"', fp);
+  if (text) {
+    for (p = text; *p; p++) {
+      if (*p == '"')
+        fputc('"', fp);
+      fputc(*p, fp);
+    }
+  }
+  fputc('"', fp);
+}
+
+static void csv_write_header(FILE *fp) {
+  fprintf(fp,
+          "trajectory_index,step,time,terminal,stop_index,transcribed_length,"
+          "bubble_left,bubble_width,hybrid_left,hybrid_len,exit_channel_left,exit_channel_length,exit_channel_bp_count,"
+          "structure,sequence_state,"
+          "dG_RNA_RNA,dG_RNA_DNA,dG_DNA_DNA,dG_total,"
+          "dG_terminal_hairpin,dG_hairpin_dt,dG_terminal_hairpin_plus1,ddG_RNA_DNA_minus1,ddG_plus1,"
+          "dG_terminal,dG_folding_inside_channel,elongation_rate_current,dG_RNA_DNA_1nt_shift,"
+          "dG_invasion_1nt,dG_invasion_2nt,dG_Rloop_1nt,dG_Rloop_2nt,"
+          "min_dG_RNA_RNA,max_dG_RNA_RNA,min_dG_RNA_DNA,max_dG_RNA_DNA,min_dG_DNA_DNA,max_dG_DNA_DNA,min_dG_total,max_dG_total,"
+          "min_dG_terminal_hairpin,max_dG_terminal_hairpin,min_dG_hairpin_dt,max_dG_hairpin_dt,"
+          "min_dG_terminal_hairpin_plus1,max_dG_terminal_hairpin_plus1,min_ddG_RNA_DNA_minus1,max_ddG_RNA_DNA_minus1,min_ddG_plus1,max_ddG_plus1,"
+          "min_exit_channel_bp_count,max_exit_channel_bp_count,min_dG_terminal,max_dG_terminal,min_dG_folding_inside_channel,max_dG_folding_inside_channel,"
+          "min_elongation_rate_current,max_elongation_rate_current,min_dG_RNA_DNA_1nt_shift,max_dG_RNA_DNA_1nt_shift,"
+          "min_dG_invasion_1nt,max_dG_invasion_1nt,min_dG_invasion_2nt,max_dG_invasion_2nt,min_dG_Rloop_1nt,max_dG_Rloop_1nt,min_dG_Rloop_2nt,max_dG_Rloop_2nt\n");
+}
+
+static void print_console_legend(void) {
+  if (console_legend_printed)
+    return;
+
+  console_legend_printed = 1;
+
+  printf("# Console output legend\n");
+  printf("# structure: RNA secondary structure at the sampled timepoint; x marks untranscribed nucleotides, b marks bubble boundaries, c marks the RNAP exit-channel start when present.\n");
+
+  if (GTV.structure_time_only) {
+    printf("# 1. time: simulation time for the sampled state.\n");
+  } else if (kinfold_bubble_enabled()) {
+    printf("# 1. dG_RNA_RNA: RNA folding free energy of the current RNA secondary structure.\n");
+    printf("# 2. dG_RNA_DNA: RNA:DNA hybrid free energy for the currently paired hybrid region.\n");
+    printf("# 3. dG_DNA_DNA: informational DNA:DNA duplex free energy for base-paired DNA nts in the bubble.\n");
+    printf("# 4. dG_terminal_hairpin: folding free energy of the 3'-most exterior RNA paired component upstream of the bubble.\n");
+    printf("# 5. dG_hairpin_dt: causal smoothed time derivative of dG_terminal_hairpin.\n");
+    printf("# 6. dG_terminal_hairpin_plus1: hypothetical terminal-hairpin energy after adding one upstream hybrid RNA nt to the hairpin.\n");
+    printf("# 7. ddG_RNA_DNA_minus1: change in RNA:DNA hybrid energy after removing the upstream-most hybrid nucleotide.\n");
+    printf("# 8. ddG_plus1: informational net free-energy change for the plus1 hairpin/hybrid displacement state.\n");
+    printf("# 9. channel_bp_count: number of RNA-RNA base pairs with at least one endpoint inside the RNAP exit channel.\n");
+    printf("# 10. dG_terminal: folding free energy of the most downstream RNA paired component intersecting the exit channel.\n");
+    printf("# 11. dG_folding_inside_channel: RNA folding free energy evaluated only inside the exit channel, ignoring external pairs.\n");
+    printf("# 12. elongation_rate_current: sequence-dependent RNAP elongation rate at the current position.\n");
+    printf("# 13. dG_RNA_DNA_1nt_shift: RNA:DNA hybrid free energy after a hypothetical 1-nt upstream RNA register shift.\n");
+    printf("# 14. dG_invasion_1nt: minimum RNA folding free energy when the 3'-most hybrid RNA nt may invade RNA structure.\n");
+    printf("# 15. dG_invasion_2nt: minimum RNA folding free energy when the two 3'-most hybrid RNA nts may invade RNA structure.\n");
+    printf("# 16. dG_Rloop_1nt: net free-energy change for one 5' bubble RNA nt invading the exit-channel RNA structure.\n");
+    printf("# 17. dG_Rloop_2nt: net free-energy change for two 5' bubble RNA nts invading the exit-channel RNA structure.\n");
+    printf("# 18. time: simulation time for the sampled state.\n");
+  } else {
+    printf("# 1. dG_RNA_RNA: RNA folding free energy of the current RNA secondary structure.\n");
+    printf("# 2. time: simulation time for the sampled state.\n");
+  }
+
+  if (GTV.phi) {
+    printf("# phi extras: zeitInc is the internal time increment, L is the accumulated Laplacian term, and D is the neighbor-count accumulator.\n");
+  }
+  if (GTV.verbose) {
+    printf("# terminal verbose extras: top is the number of enumerated neighbors and lmin is the local-minimum status flag.\n");
+  }
+  printf("# terminal marker: O means the trajectory ended by time limit; Xn means stop structure n was reached.\n");
+  fflush(stdout);
+}
+
+static void interval_metrics_reset(KinfoldIntervalMetrics *interval) {
+  if (!interval)
+    return;
+
+  memset(interval, 0, sizeof(*interval));
+  interval->initialized = 0;
+}
+
+static void interval_metrics_update(KinfoldIntervalMetrics *interval, const KinfoldInformationalMetrics *metrics) {
+  double rna_energy, hybrid_energy, dna_duplex_energy, total_energy;
+
+  if (!interval || !metrics)
+    return;
+
+  rna_energy = displayed_structure_energy();
+  hybrid_energy = displayed_hybrid_energy();
+  dna_duplex_energy = displayed_dna_duplex_energy();
+  total_energy = displayed_energy();
+
+#define UPDATE_RANGE(field_min, field_max, value) \
+  do { \
+    if (!interval->initialized) { \
+      interval->field_min = (value); \
+      interval->field_max = (value); \
+    } else { \
+      if ((value) < interval->field_min) interval->field_min = (value); \
+      if ((value) > interval->field_max) interval->field_max = (value); \
+    } \
+  } while (0)
+
+  UPDATE_RANGE(min_rna_energy, max_rna_energy, rna_energy);
+  UPDATE_RANGE(min_hybrid_energy, max_hybrid_energy, hybrid_energy);
+  UPDATE_RANGE(min_dna_duplex_energy, max_dna_duplex_energy, dna_duplex_energy);
+  UPDATE_RANGE(min_total_energy, max_total_energy, total_energy);
+  UPDATE_RANGE(min_terminal_hairpin_energy, max_terminal_hairpin_energy, metrics->terminal_hairpin_energy);
+  UPDATE_RANGE(min_terminal_hairpin_dg_dt, max_terminal_hairpin_dg_dt, metrics->terminal_hairpin_dg_dt);
+  UPDATE_RANGE(min_terminal_hairpin_plus1_energy, max_terminal_hairpin_plus1_energy, metrics->terminal_hairpin_plus1_energy);
+  UPDATE_RANGE(min_rna_dna_minus1_ddg, max_rna_dna_minus1_ddg, metrics->rna_dna_minus1_ddg);
+  UPDATE_RANGE(min_plus1_ddg, max_plus1_ddg, metrics->plus1_ddg);
+  UPDATE_RANGE(min_exit_channel_bp_count, max_exit_channel_bp_count, (double)metrics->exit_channel_bp_count);
+  UPDATE_RANGE(min_terminal_energy, max_terminal_energy, metrics->terminal_energy);
+  UPDATE_RANGE(min_folding_inside_channel_energy, max_folding_inside_channel_energy, metrics->folding_inside_channel_energy);
+  UPDATE_RANGE(min_elongation_rate_current, max_elongation_rate_current, metrics->elongation_rate_current);
+  UPDATE_RANGE(min_rna_dna_1nt_shift_energy, max_rna_dna_1nt_shift_energy, metrics->rna_dna_1nt_shift_energy);
+  UPDATE_RANGE(min_invasion_1nt_energy, max_invasion_1nt_energy, metrics->invasion_1nt_energy);
+  UPDATE_RANGE(min_invasion_2nt_energy, max_invasion_2nt_energy, metrics->invasion_2nt_energy);
+  UPDATE_RANGE(min_rloop_1nt_energy, max_rloop_1nt_energy, metrics->rloop_1nt_energy);
+  UPDATE_RANGE(min_rloop_2nt_energy, max_rloop_2nt_energy, metrics->rloop_2nt_energy);
+
+#undef UPDATE_RANGE
+
+  interval->initialized = 1;
+}
+
+static void interval_seed_from_emitted_state(const KinfoldInformationalMetrics *metrics) {
+  interval_metrics_reset(&current_interval_metrics);
+  interval_metrics_update(&current_interval_metrics, metrics);
+}
+
+static void begin_trajectory_if_needed(void) {
+  KinfoldInformationalMetrics metrics;
+
+  if (csv_tracker_active && (csv_tracker_trajectory == GSV.trajectory_index))
+    return;
+
+  csv_tracker_active = 1;
+  csv_tracker_trajectory = GSV.trajectory_index;
+  csv_last_emitted_time = -1.0;
+  interval_metrics_reset(&current_interval_metrics);
+  interval_metrics_reset(&last_exported_interval_metrics);
+  kinfold_metric_smoother_reset(&csv_metric_state);
+  memset(&metrics, 0, sizeof(metrics));
+  kinfold_compute_metrics_for_time(0.0, &csv_metric_state, &metrics);
+  interval_metrics_update(&current_interval_metrics, &metrics);
+}
+
+static void track_hidden_state(double time_value) {
+  KinfoldInformationalMetrics metrics;
+
+  begin_trajectory_if_needed();
+  memset(&metrics, 0, sizeof(metrics));
+  kinfold_compute_metrics_for_time(time_value, &csv_metric_state, &metrics);
+  interval_metrics_update(&current_interval_metrics, &metrics);
+}
+
+static void emit_csv_state_line(double out_time, int found_stop, int terminal, const KinfoldInformationalMetrics *metrics) {
+  if (!csvFP || !metrics)
+    return;
+
+  fprintf(csvFP,
+          "%d,%d,%.10g,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,",
+          GSV.trajectory_index,
+          GSV.steps,
+          out_time,
+          terminal ? 1 : 0,
+          found_stop,
+          GSV.tx_len,
+          GSV.bubble_left,
+          GSV.bubble_width,
+          GSV.hybrid_left,
+          GSV.hybrid_len,
+          kinfold_channel_left(),
+          kinfold_channel_length(),
+          metrics->exit_channel_bp_count);
+  csv_write_escaped(csvFP, transcription_active() ? kinfold_cli_structure_state() : costring(GAV.currform));
+  fputc(',', csvFP);
+  csv_write_escaped(csvFP, transcription_active() ? kinfold_full_sequence_state() : GAV.farbe);
+  fprintf(csvFP,
+          ",%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g",
+          displayed_structure_energy(),
+          displayed_hybrid_energy(),
+          displayed_dna_duplex_energy(),
+          displayed_energy(),
+          metrics->terminal_hairpin_energy,
+          metrics->terminal_hairpin_dg_dt,
+          metrics->terminal_hairpin_plus1_energy,
+          metrics->rna_dna_minus1_ddg,
+          metrics->plus1_ddg,
+          metrics->terminal_energy,
+          metrics->folding_inside_channel_energy,
+          metrics->elongation_rate_current,
+          metrics->rna_dna_1nt_shift_energy,
+          metrics->invasion_1nt_energy,
+          metrics->invasion_2nt_energy,
+          metrics->rloop_1nt_energy,
+          metrics->rloop_2nt_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_rna_energy, current_interval_metrics.max_rna_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_hybrid_energy, current_interval_metrics.max_hybrid_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_dna_duplex_energy, current_interval_metrics.max_dna_duplex_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_total_energy, current_interval_metrics.max_total_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_terminal_hairpin_energy, current_interval_metrics.max_terminal_hairpin_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_terminal_hairpin_dg_dt, current_interval_metrics.max_terminal_hairpin_dg_dt);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_terminal_hairpin_plus1_energy, current_interval_metrics.max_terminal_hairpin_plus1_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_rna_dna_minus1_ddg, current_interval_metrics.max_rna_dna_minus1_ddg);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_plus1_ddg, current_interval_metrics.max_plus1_ddg);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_exit_channel_bp_count, current_interval_metrics.max_exit_channel_bp_count);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_terminal_energy, current_interval_metrics.max_terminal_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_folding_inside_channel_energy, current_interval_metrics.max_folding_inside_channel_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_elongation_rate_current, current_interval_metrics.max_elongation_rate_current);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_rna_dna_1nt_shift_energy, current_interval_metrics.max_rna_dna_1nt_shift_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_invasion_1nt_energy, current_interval_metrics.max_invasion_1nt_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_invasion_2nt_energy, current_interval_metrics.max_invasion_2nt_energy);
+  fprintf(csvFP, ",%.10g,%.10g", current_interval_metrics.min_rloop_1nt_energy, current_interval_metrics.max_rloop_1nt_energy);
+  fprintf(csvFP, ",%.10g,%.10g\n", current_interval_metrics.min_rloop_2nt_energy, current_interval_metrics.max_rloop_2nt_energy);
+  fflush(csvFP);
+  last_exported_interval_metrics = current_interval_metrics;
+  interval_seed_from_emitted_state(metrics);
+  csv_last_emitted_time = out_time;
+}
+
 static void emit_state_line(double out_time, int found_stop, int terminal) {
   int flag = 0;
   KinfoldInformationalMetrics metrics;
+  const char *structure;
 
   if (!should_emit_to_stdout())
     return;
@@ -457,13 +731,30 @@ static void emit_state_line(double out_time, int found_stop, int terminal) {
     return;
 
   kinfold_get_sample_metrics(&metrics);
+  emit_csv_state_line(out_time, found_stop, terminal, &metrics);
+  structure = transcription_active() ? kinfold_cli_structure_state() : costring(GAV.currform);
 
-  if (kinfold_bubble_enabled()) {
-    char format[160];
-    sprintf(format, "%%-%lus %%6.2f %%6.2f %%6.2f %%6.2f %%8.4f %%6.2f %%6.2f %%6.2f %%10.3f",
+  print_console_legend();
+
+  if (GTV.structure_time_only && !structure_time_header_printed) {
+    printf("%s\n", GAV.farbe_full ? GAV.farbe_full : GAV.farbe);
+    structure_time_header_printed = 1;
+    if (!transcription_active())
+      structure = costring(GAV.currform);
+  }
+
+  if (GTV.structure_time_only) {
+    char format[64];
+    sprintf(format, "%%-%lus %%10.3f",
+            (unsigned long)strlen(GAV.farbe_full ? GAV.farbe_full : GAV.farbe) + 1UL);
+    printf(format, structure, out_time);
+  } else if (kinfold_bubble_enabled()) {
+
+    char format[256];
+    sprintf(format, "%%-%lus %%6.2f %%6.2f %%6.2f %%6.2f %%8.4f %%6.2f %%6.2f %%6.2f %%4d %%6.2f %%6.2f %%9.3f %%6.2f %%6.2f %%6.2f %%6.2f %%6.2f %%10.3f",
             (unsigned long)strlen(GAV.farbe_full) + 1UL);
     printf(format,
-           transcription_active() ? kinfold_cli_structure_state() : costring(GAV.currform),
+           structure,
            displayed_structure_energy(),
            displayed_hybrid_energy(),
            displayed_dna_duplex_energy(),
@@ -472,13 +763,22 @@ static void emit_state_line(double out_time, int found_stop, int terminal) {
            metrics.terminal_hairpin_plus1_energy,
            metrics.rna_dna_minus1_ddg,
            metrics.plus1_ddg,
+           metrics.exit_channel_bp_count,
+           metrics.terminal_energy,
+           metrics.folding_inside_channel_energy,
+           metrics.elongation_rate_current,
+           metrics.rna_dna_1nt_shift_energy,
+           metrics.invasion_1nt_energy,
+           metrics.invasion_2nt_energy,
+           metrics.rloop_1nt_energy,
+           metrics.rloop_2nt_energy,
            out_time);
   } else {
     char format[64];
     sprintf(format, "%%-%lus %%6.2f %%10.3f",
             (unsigned long)strlen(GAV.farbe_full) + 1UL);
     printf(format,
-           transcription_active() ? kinfold_cli_structure_state() : costring(GAV.currform),
+           structure,
            displayed_structure_energy(),
            out_time);
   }
@@ -515,10 +815,14 @@ static void emit_sampled_states(double limit_time, int include_limit_time) {
 
 static double compute_transition_rate(unsigned char kind, double curr_total, double total_E) {
   double dE;
+  double elongation_propensity;
 
   dE = total_E - curr_total;
-  if ((kind == MOVE_ELONGATE) && (GSV.elongation_propensity_internal > 0.0))
-    return GSV.elongation_propensity_internal;
+  if (kind == MOVE_ELONGATE) {
+    elongation_propensity = kinfold_current_elongation_propensity();
+    if (elongation_propensity > 0.0)
+      return elongation_propensity;
+  }
 
   if (GTV.mc) {
     if (dE < 0.0)
@@ -534,10 +838,13 @@ static void dump_transcription_state(FILE *fp) {
     return;
 
   fprintf(fp,
-          "#TXSTATE step=%d tx_len=%d full_len=%d bubble_left=%d bubble_width=%d hybrid_left=%d hybrid_len=%d curr_rna_E=%.2f curr_total_E=%.2f seq=%s struct=%s\n",
+          "#TXSTATE step=%d tx_len=%d full_len=%d channel_left=%d channel_length=%d elongation_rate=%.6f bubble_left=%d bubble_width=%d hybrid_left=%d hybrid_len=%d curr_rna_E=%.2f curr_total_E=%.2f seq=%s struct=%s\n",
           GSV.steps,
           GSV.tx_len,
           GSV.full_len,
+          kinfold_channel_left(),
+          kinfold_channel_length(),
+          kinfold_current_elongation_rate(),
           GSV.bubble_left,
           GSV.bubble_width,
           GSV.hybrid_left,
@@ -648,7 +955,7 @@ static void append_transcription_neighbors(void) {
 
   dump_transcription_state(stderr);
 
-  if ((GSV.tx_len < GSV.full_len) && (GSV.elongation_propensity_internal > 0.0)) {
+  if ((GSV.tx_len < GSV.full_len) && (kinfold_current_elongation_propensity() > 0.0)) {
     int new_len;
     int next_bubble_left = 0, next_bubble_width = 0, next_hybrid_left = 0, next_hybrid_len = 0;
     char *temp_structure;
@@ -797,6 +1104,62 @@ static void append_transcription_neighbors(void) {
     GSV.hybrid_len   = saved_hybrid_len;
   }
 
+  if ((GSV.hybrid_len > 0) &&
+      kinfold_is_unpaired_position(GSV.hybrid_left)) {
+    char *temp_structure;
+
+    temp_structure = strdup(GAV.currform);
+    assert(temp_structure != NULL);
+    for (i = 0; i < GSV.hybrid_left; i++) {
+      if (!position_in_exit_channel_current(i))
+        continue;
+      if (!kinfold_is_unpaired_position(i))
+        continue;
+      if (!kinfold_can_pair_positions_raw(i, saved_hybrid_left))
+        continue;
+
+      if (i < saved_hybrid_left) {
+        temp_structure[i] = '(';
+        temp_structure[saved_hybrid_left] = ')';
+      } else {
+        temp_structure[saved_hybrid_left] = '(';
+        temp_structure[i] = ')';
+      }
+
+      rna_iE = kinfold_eval_structure_dcal(temp_structure);
+      GSV.hybrid_left = saved_hybrid_left + 1;
+      GSV.hybrid_len = saved_hybrid_len - 1;
+      if (GSV.hybrid_len <= 0) {
+        GSV.hybrid_len = 0;
+        GSV.hybrid_left = GSV.len;
+      }
+      total_E = (double)rna_iE / 100.0 + kinfold_current_hybrid_energy();
+      dump_transcription_neighbor(stderr,
+                                  MOVE_BUBBLE_INVASION,
+                                  i + 1,
+                                  saved_hybrid_left + 1,
+                                  GSV.tx_len,
+                                  GSV.bubble_left,
+                                  GSV.bubble_width,
+                                  GSV.hybrid_left,
+                                  GSV.hybrid_len,
+                                  rna_iE,
+                                  total_E,
+                                  compute_transition_rate(MOVE_BUBBLE_INVASION, curr_total_before, total_E));
+      update_nbList_kind(MOVE_BUBBLE_INVASION,
+                         i + 1,
+                         saved_hybrid_left + 1,
+                         rna_iE,
+                         total_E);
+
+      GSV.hybrid_left = saved_hybrid_left;
+      GSV.hybrid_len = saved_hybrid_len;
+      temp_structure[i] = '.';
+      temp_structure[saved_hybrid_left] = '.';
+    }
+    free(temp_structure);
+  }
+
   if ((GSV.bubble_left < GSV.hybrid_left) &&
       kinfold_is_unpaired_position(GSV.bubble_left)) {
     char *temp_structure;
@@ -923,9 +1286,11 @@ static void apply_transcription_move(int next) {
 
     case MOVE_BUBBLE_INVASION: {
       int i, j;
+      int targets_hybrid_left;
 
       i = neighbor_list[2*next] - 1;
       j = neighbor_list[2*next+1] - 1;
+      targets_hybrid_left = ((i == GSV.hybrid_left) || (j == GSV.hybrid_left)) ? 1 : 0;
       if (i < j) {
         GAV.currform[i] = '(';
         GAV.currform[j] = ')';
@@ -933,13 +1298,22 @@ static void apply_transcription_move(int next) {
         GAV.currform[j] = '(';
         GAV.currform[i] = ')';
       }
-      GSV.bubble_left++;
-      GSV.bubble_width--;
-      if (GSV.bubble_width <= 0) {
-        GSV.bubble_width = 0;
-        GSV.bubble_left = GSV.len;
-        GSV.hybrid_left = GSV.len;
-        GSV.hybrid_len = 0;
+      if (targets_hybrid_left) {
+        GSV.hybrid_left++;
+        GSV.hybrid_len--;
+        if (GSV.hybrid_len <= 0) {
+          GSV.hybrid_len = 0;
+          GSV.hybrid_left = GSV.len;
+        }
+      } else {
+        GSV.bubble_left++;
+        GSV.bubble_width--;
+        if (GSV.bubble_width <= 0) {
+          GSV.bubble_width = 0;
+          GSV.bubble_left = GSV.len;
+          GSV.hybrid_left = GSV.len;
+          GSV.hybrid_len = 0;
+        }
       }
       GSV.currE = energies[next];
       kinfold_rebuild_current_state();
@@ -963,6 +1337,10 @@ void clean_up_nbList(void){
     fprintf(logFP,"\n");
     fclose(logFP);
     logFP = NULL;
+  }
+  if (csvFP != NULL) {
+    fclose(csvFP);
+    csvFP = NULL;
   }
 }
 
@@ -1025,6 +1403,19 @@ kinfold_move_char(int next)
     return 'I';
 
   return 'D';
+}
+
+void
+kinfold_get_interval_metrics_for_time(double time_value,
+                                      KinfoldIntervalMetrics *metrics)
+{
+  if (!metrics)
+    return;
+
+  if (csv_tracker_active && (fabs(csv_last_emitted_time - time_value) <= 1e-9))
+    *metrics = last_exported_interval_metrics;
+  else
+    *metrics = current_interval_metrics;
 }
 
 static const char *costring(const char *str) {
